@@ -10,9 +10,7 @@ from sqlalchemy import pool
 
 from app.core.config import settings
 from app.core.db import Base
-
-# Importer ici les modèles pour qu'Alembic détecte les tables (Phase 1) :
-# from app.models import machine, metric, alert, user  # noqa: F401
+import app.models  # noqa: F401  (enregistre toutes les tables sur Base.metadata)
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_url)
@@ -23,19 +21,35 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 
+def include_object(obj, name, type_, reflected, compare_to) -> bool:
+    """Ignorer les objets gérés par TimescaleDB lors de l'autogénération.
+
+    ``create_hypertable`` crée automatiquement ``metrics_time_idx`` ;
+    sans ce filtre, Alembic le voit comme une dérive et tente de le supprimer.
+    """
+    if type_ == "index" and name == "metrics_time_idx":
+        return False
+    return True
+
+
 def run_migrations_offline() -> None:
     context.configure(
         url=settings.database_url,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        include_object=include_object,
     )
     with context.begin_transaction():
         context.run_migrations()
 
 
 def do_run_migrations(connection) -> None:
-    context.configure(connection=connection, target_metadata=target_metadata)
+    context.configure(
+        connection=connection,
+        target_metadata=target_metadata,
+        include_object=include_object,
+    )
     with context.begin_transaction():
         context.run_migrations()
 

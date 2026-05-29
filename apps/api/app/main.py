@@ -1,6 +1,8 @@
 """Point d'entrée FastAPI de GuardianOps AI."""
 from __future__ import annotations
 
+import asyncio
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -8,15 +10,30 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from app.core.config import settings
-from app.core.db import engine
+from app.core.db import SessionLocal, engine
 from app.core.redis import redis_client
+from app.routers import agents, alerts, auth, ingest, machines, ws
+from app.services import alerting
+
+log = logging.getLogger(__name__)
+
+
+async def _offline_check_loop() -> None:
+    """Vérifie toutes les 30 s les machines silencieuses et crée des alertes offline."""
+    while True:
+        await asyncio.sleep(30)
+        try:
+            async with SessionLocal() as db:
+                await alerting.check_offline_machines(db)
+        except Exception:  # noqa: BLE001
+            log.exception("Offline check loop error")
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    # Démarrage : rien à initialiser pour l'instant (migrations gérées par Alembic).
+    task = asyncio.create_task(_offline_check_loop())
     yield
-    # Arrêt : fermeture propre des connexions.
+    task.cancel()
     await engine.dispose()
     await redis_client.aclose()
 
@@ -35,6 +52,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(auth.router)
+app.include_router(machines.router)
+app.include_router(agents.router)
+app.include_router(ingest.router)
+app.include_router(alerts.router)
+app.include_router(ws.router)
 
 
 @app.get("/health", tags=["health"])
