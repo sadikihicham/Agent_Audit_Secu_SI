@@ -1,0 +1,4 @@
+# Données runtime de l'agent — ne jamais committer (contiennent des secrets).
+agent.toml
+agent_state.toml
+queue.json

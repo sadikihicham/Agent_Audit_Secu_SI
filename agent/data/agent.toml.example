@@ -1,0 +1,11 @@
+# GuardianOps AI — config de l'agent lancé via docker compose (profil "agent").
+# Copier en agent.toml et renseigner enroll_token (cf. docs/runbook.md).
+
+# Sur le réseau Docker Compose, l'API est joignable par son nom de service.
+api_url = "http://api:8000"
+
+# Token d'enrôlement à usage unique — obtenu via POST /machines.
+enroll_token = "REMPLACER_PAR_LE_TOKEN_FOURNI_PAR_LADMIN"
+
+interval_secs = 30
+max_queue_size = 1000

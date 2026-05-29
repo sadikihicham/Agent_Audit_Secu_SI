@@ -1,0 +1,16 @@
+# GuardianOps AI — configuration de l'agent
+# Copier en agent.toml et ajuster les valeurs.
+
+# URL de l'API (sans slash final)
+api_url = "http://localhost:8800"
+
+# Token d'enrôlement — fourni par l'admin via POST /machines.
+# OBLIGATOIRE au premier lancement. Peut être supprimé ensuite
+# (agent_state.toml est créé après le premier enrôlement).
+enroll_token = "REMPLACER_PAR_LE_TOKEN_FOURNI_PAR_LADMIN"
+
+# Intervalle de collecte + envoi en secondes (défaut : 30)
+interval_secs = 30
+
+# Taille maximale de la file offline (défaut : 1000 échantillons)
+max_queue_size = 1000
