@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { Providers } from "./providers";
 
 export const metadata: Metadata = {
   title: "GuardianOps AI",
@@ -14,7 +15,7 @@ export default function RootLayout({
   return (
     <html lang="fr" className="dark">
       <body className="min-h-screen bg-guardian-bg text-slate-100 antialiased">
-        {children}
+        <Providers>{children}</Providers>
       </body>
     </html>
   );
