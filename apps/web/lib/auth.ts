@@ -8,7 +8,10 @@ export const getToken = (): string | null =>
   Cookies.get(COOKIE) ?? null;
 
 export const setToken = (token: string): void => {
-  Cookies.set(COOKIE, token, { sameSite: "lax" });
+  // Drapeau `secure` activé dès que la page est servie en HTTPS (prod derrière TLS).
+  const secure =
+    typeof window !== "undefined" && window.location.protocol === "https:";
+  Cookies.set(COOKIE, token, { sameSite: "lax", secure });
 };
 
 export const clearToken = (): void => {

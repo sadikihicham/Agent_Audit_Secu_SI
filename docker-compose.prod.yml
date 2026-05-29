@@ -1,0 +1,73 @@
+# Surcouche de PRODUCTION (durcissement).
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Par rapport au dev :
+#  - db & redis ne sont PLUS exposés sur l'hôte (accès réseau interne uniquement) ;
+#  - Redis exige un mot de passe (--requirepass) ;
+#  - l'API tourne sur l'image construite (pas de montage du code, pas de --reload),
+#    ENVIRONMENT=production → /docs, /redoc, /openapi.json désactivés ;
+#  - le dashboard est servi en build de production (Next standalone) ;
+#  - un reverse-proxy Caddy termine le TLS et est le SEUL service exposé (80/443).
+#
+# Variables requises dans .env : DOMAIN, REDIS_PASSWORD, POSTGRES_* , JWT_SECRET.
+# Nécessite Docker Compose ≥ 2.24 (tag de fusion !override).
+name: guardianops
+
+services:
+  db:
+    ports: !override []
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER requis en production}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD requis en production}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB requis en production}
+
+  redis:
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?REDIS_PASSWORD requis en production}"]
+    ports: !override []
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    # Pas de montage du code source, pas de --reload (image immuable).
+    volumes: !override []
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports: !override []
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      CORS_ORIGINS: https://${DOMAIN:?DOMAIN requis en production}
+
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile.prod
+    volumes: !override []
+    ports: !override []
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: https://api.${DOMAIN}
+
+  proxy:
+    image: caddy:2-alpine
+    container_name: guardianops-proxy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+      - web
+
+volumes:
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,15 @@
+# Reverse-proxy Caddy — TLS automatique (Let's Encrypt en prod, CA interne en local).
+# Le dashboard et l'API sont servis sur deux sous-domaines distincts.
+# WebSocket : Caddy gère l'upgrade automatiquement via reverse_proxy.
+
+# Dashboard Next.js
+{$DOMAIN} {
+	encode gzip
+	reverse_proxy web:3000
+}
+
+# API FastAPI (REST + WebSocket /ws)
+api.{$DOMAIN} {
+	encode gzip
+	reverse_proxy api:8000
+}

@@ -88,3 +88,14 @@ def test_config_accepts_strong_secret() -> None:
     import secrets as _s
     strong = _s.token_hex(32)
     assert _run_validator(strong) == strong
+
+
+# ── Exposition des docs OpenAPI selon l'environnement ─────────────────────────
+
+def test_docs_exposed_only_in_development() -> None:
+    from app.main import should_expose_docs
+
+    assert should_expose_docs("development") is True
+    assert should_expose_docs("production") is False
+    assert should_expose_docs("staging") is False
+    assert should_expose_docs("") is False

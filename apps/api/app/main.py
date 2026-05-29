@@ -38,11 +38,21 @@ async def lifespan(_app: FastAPI):
     await redis_client.aclose()
 
 
+def should_expose_docs(environment: str) -> bool:
+    """N'exposer /docs, /redoc et /openapi.json qu'en développement."""
+    return environment == "development"
+
+
+_docs_enabled = should_expose_docs(settings.environment)
+
 app = FastAPI(
     title=settings.app_name,
     version="0.1.0",
     description="Plateforme d'audit permanent SI, monitoring et sécurité.",
     lifespan=lifespan,
+    docs_url="/docs" if _docs_enabled else None,
+    redoc_url="/redoc" if _docs_enabled else None,
+    openapi_url="/openapi.json" if _docs_enabled else None,
 )
 
 app.add_middleware(

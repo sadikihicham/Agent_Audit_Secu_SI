@@ -142,4 +142,45 @@ docker compose down -v        # ⚠ supprime le volume DB
 - Mots de passe hashés **argon2**.
 - En production : terminaison **TLS** via reverse-proxy, restreindre l'exposition réseau
   de PostgreSQL/Redis (ne pas publier 5433/6380 hors de l'hôte), changer les
-  identifiants DB par défaut.
+  identifiants DB par défaut. → automatisé par la surcouche `docker-compose.prod.yml` (§8).
+
+---
+
+## 8. Déploiement production (durcissement)
+
+La surcouche `docker-compose.prod.yml` applique le durcissement sans toucher au
+workflow de dev :
+
+| Aspect | Dev (`docker-compose.yml`) | Prod (`+ docker-compose.prod.yml`) |
+|--------|----------------------------|------------------------------------|
+| `/docs`, `/redoc`, `/openapi.json` | exposés | **désactivés** (`ENVIRONMENT=production`) |
+| PostgreSQL / Redis | ports publiés sur l'hôte | **non exposés** (réseau interne) |
+| Redis | sans mot de passe | **`--requirepass`** obligatoire |
+| API | code monté + `--reload` | image immuable, sans reload |
+| Dashboard | `next dev` | build **standalone** (`Dockerfile.prod`) |
+| TLS / entrée | aucune | **Caddy** (HTTPS auto), seul service exposé (80/443) |
+| Cookie token | `sameSite=lax` | `+ secure` (auto en HTTPS) |
+
+### Prérequis `.env`
+```dotenv
+DOMAIN=mon-domaine.com                 # dashboard ; API sur api.mon-domaine.com
+JWT_SECRET=<valeur forte ≥ 32 car.>    # python3 -c "import secrets; print(secrets.token_hex(32))"
+POSTGRES_USER=…  POSTGRES_PASSWORD=<fort>  POSTGRES_DB=…
+REDIS_PASSWORD=<fort>
+```
+Les DNS `mon-domaine.com` et `api.mon-domaine.com` doivent pointer vers l'hôte
+(Caddy obtient alors les certificats Let's Encrypt automatiquement).
+
+### Lancement
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+# migrations + admin (le service api n'a pas de port publié → exec dans le conteneur)
+docker compose -f docker-compose.yml -f docker-compose.prod.yml exec api alembic upgrade head
+docker compose -f docker-compose.yml -f docker-compose.prod.yml exec api \
+  python -m app.cli create-admin admin@mon-domaine.com '<motdepasse>'
+```
+
+> Nécessite Docker Compose ≥ 2.24 (tag de fusion `!override` pour retirer les ports).
+> Mise à l'échelle horizontale de l'API : la tâche périodique de détection offline
+> (`main.py`) suppose une **instance unique** ; l'extraire avant de lancer plusieurs
+> répliques/workers.
