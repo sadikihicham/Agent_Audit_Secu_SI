@@ -215,6 +215,13 @@ de fond (cf. `scheduler`, instance unique), session via JWT, ticket WebSocket et
 événements via **Redis partagé** (n'importe quelle réplique sert n'importe quelle
 requête, y compris la consommation d'un ticket émis par une autre).
 
+**Résilience** — Caddy détecte les répliques défaillantes par health-check
+*passif* + ré-essai (`lb_try_duration`, `fail_duration` dans `infra/caddy/Caddyfile`) :
+une réplique qui tombe est éjectée 10 s, et la requête en cours est rejouée sur
+une réplique saine → **aucune erreur côté client**. (Les health-checks *actifs*
+sont volontairement évités : ils se combinent mal aux upstreams dynamiques.)
+Vérifié : arrêt d'une réplique sur 3 → 50 requêtes, 0 échec.
+
 Garde-fous :
 - **Ne pas répliquer le `scheduler`** (instance unique). Un doublon ne crée pas
   de doublon d'alerte — l'ouverture est idempotente via l'index unique partiel
