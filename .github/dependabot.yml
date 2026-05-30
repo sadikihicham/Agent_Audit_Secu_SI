@@ -1,0 +1,58 @@
+version: 2
+
+# Mises à jour automatiques des dépendances + actions GitHub.
+# Les patchs/mineurs sont regroupés en une PR par écosystème (moins de bruit) ;
+# les majeurs restent en PR séparées (revue manuelle).
+updates:
+  # GitHub Actions (résout aussi les dépréciations de runner, ex. Node 20→24).
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      actions:
+        update-types: [minor, patch]
+
+  # Backend Python (requirements.txt + requirements-dev.txt).
+  - package-ecosystem: pip
+    directory: /apps/api
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      python:
+        update-types: [minor, patch]
+
+  # Dashboard Next.js.
+  - package-ecosystem: npm
+    directory: /apps/web
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      web:
+        update-types: [minor, patch]
+
+  # Agent Rust.
+  - package-ecosystem: cargo
+    directory: /agent
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      rust:
+        update-types: [minor, patch]
+
+  # Images de base des Dockerfiles.
+  - package-ecosystem: docker
+    directories:
+      - /apps/api
+      - /apps/web
+      - /agent
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      docker:
+        update-types: [minor, patch]
