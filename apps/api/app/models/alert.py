@@ -12,11 +12,16 @@ from app.core.db import Base
 if TYPE_CHECKING:
     from app.models.machine import Machine
 
-# Types d'alerte (cf. règles de seuils — PLAN.md §3).
+# Types d'alerte par seuil (cf. PLAN.md §3).
 TYPE_CPU_HIGH = "cpu_high"
 TYPE_MEM_HIGH = "mem_high"
 TYPE_DISK_FULL = "disk_full"
 TYPE_OFFLINE = "offline"
+
+# Types d'alerte d'anomalie (écart au comportement habituel de la machine).
+TYPE_CPU_ANOMALY = "cpu_anomaly"
+TYPE_MEM_ANOMALY = "mem_anomaly"
+TYPE_DISK_ANOMALY = "disk_anomaly"
 
 # Sévérités.
 SEVERITY_WARNING = "warning"

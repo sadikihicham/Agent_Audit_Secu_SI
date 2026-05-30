@@ -58,13 +58,13 @@ def _flow_db(rows, insert_id: int | None = 1, existing_open: Alert | None = None
     return db
 
 
-# ── _open_alert : INSERT ... ON CONFLICT DO NOTHING RETURNING ─────────────────
+# ── open_alert : INSERT ... ON CONFLICT DO NOTHING RETURNING ─────────────────
 
 @pytest.mark.asyncio
 async def test_open_alert_publishes_when_inserted() -> None:
     db = _flow_db(rows=[], insert_id=123)  # une ligne a été insérée
     with patch.object(alerting, "_publish", new=AsyncMock()) as pub:
-        await alerting._open_alert(db, 1, TYPE_CPU_HIGH, SEVERITY_WARNING, "msg", 95.0, 90.0)
+        await alerting.open_alert(db, 1, TYPE_CPU_HIGH, SEVERITY_WARNING, "msg", 95.0, 90.0)
     db.execute.assert_awaited_once()
     pub.assert_awaited_once()
     assert pub.await_args[0][0]["event"] == "alert.created"
@@ -74,30 +74,30 @@ async def test_open_alert_publishes_when_inserted() -> None:
 async def test_open_alert_silent_on_conflict() -> None:
     db = _flow_db(rows=[], insert_id=None)  # conflit → aucune ligne insérée
     with patch.object(alerting, "_publish", new=AsyncMock()) as pub:
-        await alerting._open_alert(db, 1, TYPE_MEM_HIGH, SEVERITY_WARNING, "msg", 95.0, 90.0)
+        await alerting.open_alert(db, 1, TYPE_MEM_HIGH, SEVERITY_WARNING, "msg", 95.0, 90.0)
     db.execute.assert_awaited_once()
     pub.assert_not_awaited()  # idempotent : pas de doublon d'événement
 
 
-# ── _maybe_resolve ────────────────────────────────────────────────────────────
+# ── resolve_alert ────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_maybe_resolve_resolves_open_alert() -> None:
+async def test_resolve_alert_resolves_open_alert() -> None:
     open_alert = Alert(machine_id=1, type=TYPE_MEM_HIGH, severity=SEVERITY_WARNING,
                        message="x", status=STATUS_OPEN)
     db = _flow_db(rows=[], existing_open=open_alert)
     with patch.object(alerting, "_publish", new=AsyncMock()) as pub:
-        await alerting._maybe_resolve(db, 1, TYPE_MEM_HIGH)
+        await alerting.resolve_alert(db, 1, TYPE_MEM_HIGH)
     assert open_alert.status == STATUS_RESOLVED
     assert open_alert.resolved_at is not None
     pub.assert_awaited_once()
 
 
 @pytest.mark.asyncio
-async def test_maybe_resolve_noop_when_no_alert() -> None:
+async def test_resolve_alert_noop_when_no_alert() -> None:
     db = _flow_db(rows=[], existing_open=None)
     with patch.object(alerting, "_publish", new=AsyncMock()) as pub:
-        await alerting._maybe_resolve(db, 1, TYPE_MEM_HIGH)
+        await alerting.resolve_alert(db, 1, TYPE_MEM_HIGH)
     pub.assert_not_awaited()
 
 

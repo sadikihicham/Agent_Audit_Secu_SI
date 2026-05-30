@@ -80,7 +80,9 @@ instantanément (push WebSocket).
 
 ---
 
-## 4. Règles d'alerte (seuils, configurables via `.env`)
+## 4. Règles d'alerte (configurables via `.env`)
+
+**Seuils absolus** (cf. PLAN.md §3) :
 
 | Alerte       | Condition par défaut                      | Sévérité  | Variable                        |
 |--------------|-------------------------------------------|-----------|---------------------------------|
@@ -89,9 +91,23 @@ instantanément (push WebSocket).
 | `disk_full`  | Disque > 90 % (1 point)                   | critical  | `ALERT_DISK_THRESHOLD`          |
 | `offline`    | Pas de heartbeat depuis > 2 min           | critical  | `ALERT_OFFLINE_MINUTES`         |
 
-Les alertes se résolvent automatiquement quand la condition disparaît (ou au retour
-du heartbeat pour `offline`). Une tâche de fond vérifie les machines silencieuses
-toutes les 30 s.
+**Anomalies statistiques** (z-score robuste médiane/MAD, *par machine*) — détectent
+un écart au comportement habituel de la machine, même sous les seuils absolus
+(ex. CPU à 60 % sur une machine qui tourne d'habitude à 10 %) :
+
+| Alerte         | Condition                                              | Sévérité | Variables |
+|----------------|--------------------------------------------------------|----------|-----------|
+| `cpu_anomaly`  | z-score robuste du CPU ≥ seuil sur N points consécutifs | warning  | `ANOMALY_Z_THRESHOLD`, `ANOMALY_WINDOW`, `ANOMALY_CONSECUTIVE_POINTS` |
+| `mem_anomaly`  | idem pour la RAM                                       | warning  | idem |
+| `disk_anomaly` | idem pour le disque                                   | warning  | idem |
+
+Message explicable, ex. : `CPU 85.0% anormal (z=+9.1, au-dessus de la base 10.0%±0.5)`.
+Activable/désactivable via `ANOMALY_ENABLED`. Nécessite `ANOMALY_MIN_SAMPLES`
+d'historique avant de s'activer (démarrage à froid).
+
+Toutes les alertes se résolvent automatiquement quand la condition disparaît (ou au
+retour du heartbeat pour `offline`). Une tâche de fond vérifie les machines
+silencieuses toutes les 30 s (cf. `scheduler`).
 
 ---
 

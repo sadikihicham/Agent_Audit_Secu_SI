@@ -9,7 +9,7 @@ from app.schemas.ingest import (
     IngestMetricsRequest,
     IngestMetricsResponse,
 )
-from app.services import alerting
+from app.services import alerting, anomaly
 from app.services.ingestion import ingest_metrics, record_heartbeat
 
 router = APIRouter(prefix="/ingest", tags=["ingest"])
@@ -28,6 +28,7 @@ async def post_metrics(
     """Ingère un batch de métriques (vidange offline queue incluse)."""
     inserted = await ingest_metrics(db, machine, payload.samples)
     await alerting.check_threshold_alerts(db, machine)
+    await anomaly.check_anomalies(db, machine)
     return IngestMetricsResponse(inserted=inserted)
 
 

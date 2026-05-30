@@ -41,6 +41,14 @@ class Settings(BaseSettings):
     alert_cpu_consecutive_points: int = 3
     alert_offline_minutes: int = 2
 
+    # Détection d'anomalies (z-score robuste par machine, base médiane/MAD)
+    anomaly_enabled: bool = True
+    anomaly_window: int = 60            # taille de la fenêtre de référence (échantillons)
+    anomaly_min_samples: int = 20       # minimum requis avant de détecter (démarrage à froid)
+    anomaly_consecutive_points: int = 2  # nb de points anormaux consécutifs requis
+    anomaly_z_threshold: float = 3.5    # seuil de z-score robuste (MAD)
+    anomaly_abs_floor: float = 5.0      # écart absolu mini (points de %) si base ~constante
+
     # CORS — liste séparée par des virgules
     cors_origins: str = "http://localhost:3300"
 

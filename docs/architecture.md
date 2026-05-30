@@ -33,9 +33,10 @@
    (`POST /ingest/metrics`, JWT agent) → insertion bulk dans l'hypertable avec
    `ON CONFLICT DO NOTHING` (idempotence pour la vidange de la file offline). Heartbeat
    met à jour `last_seen_at` + statut.
-3. **Alerting** — après chaque ingestion, le service de seuils ouvre/résout les alertes ;
-   une tâche de fond (30 s) détecte les machines `offline`. Chaque changement d'état publie
-   un événement sur le canal Redis `guardianops:events`.
+3. **Alerting** — après chaque ingestion, le service de seuils ouvre/résout les alertes,
+   puis le service d'anomalies compare chaque métrique à la base de référence propre à
+   la machine (z-score robuste) ; une tâche de fond (30 s) détecte les machines `offline`.
+   Chaque changement d'état publie un événement sur le canal Redis `guardianops:events`.
 4. **Temps réel** — le dashboard ouvre un WebSocket (`WS /ws?ticket=…`) qui relaie les
    événements Redis ; les vues invalident leur cache TanStack Query à réception.
 
@@ -51,7 +52,9 @@
 - `deps.py` — dépendances d'auth : `get_current_user` / `get_current_agent` (vérifient la
   signature **et le claim `type`**).
 - `routers/` — `auth`, `machines`, `agents`, `ingest`, `alerts`, `ws`.
-- `services/` — `ingestion` (bulk insert), `alerting` (règles de seuils + pub/sub).
+- `services/` — `ingestion` (bulk insert), `alerting` (règles de seuils + pub/sub),
+  `anomaly` (détection statistique par machine : z-score robuste médiane/MAD →
+  `cpu/mem/disk_anomaly`, complète les seuils absolus).
 - `models/` — `User`, `Machine`, `Metric` (hypertable), `Alert`.
 - `alembic/` — migrations (`0001` schéma initial + hypertable, `0002` hostname nullable).
 

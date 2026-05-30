@@ -57,6 +57,7 @@ du [runbook](./docs/runbook.md#3-démo-end-to-end-agent--api--dashboard).
 - **Enrôlement** — token à usage unique, stocké hashé, échangé contre un JWT agent.
 - **Ingestion** — métriques par batch dans une hypertable TimescaleDB ; file offline idempotente.
 - **Alerting** — seuils CPU/RAM/Disque + détection offline, auto-résolution, events Redis.
+- **Détection d'anomalies** — z-score robuste par machine (médiane/MAD) : repère un écart au comportement habituel même sous les seuils absolus.
 - **Temps réel** — WebSocket (auth par ticket à usage unique) → dashboard live.
 - **Dashboard** — login, vue parc, détail machine (graphes), alertes filtrables.
 

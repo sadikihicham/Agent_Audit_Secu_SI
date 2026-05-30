@@ -63,7 +63,7 @@ async def check_threshold_alerts(db: AsyncSession, machine: Machine) -> None:
 
     # cpu_high — N points consécutifs au-dessus du seuil
     if len(rows) >= n and all(r.cpu_pct > settings.alert_cpu_threshold for r in rows):
-        await _open_alert(
+        await open_alert(
             db,
             machine.id,
             TYPE_CPU_HIGH,
@@ -73,11 +73,11 @@ async def check_threshold_alerts(db: AsyncSession, machine: Machine) -> None:
             settings.alert_cpu_threshold,
         )
     else:
-        await _maybe_resolve(db, machine.id, TYPE_CPU_HIGH)
+        await resolve_alert(db, machine.id, TYPE_CPU_HIGH)
 
     # mem_high — 1 point
     if latest.mem_pct > settings.alert_mem_threshold:
-        await _open_alert(
+        await open_alert(
             db,
             machine.id,
             TYPE_MEM_HIGH,
@@ -87,11 +87,11 @@ async def check_threshold_alerts(db: AsyncSession, machine: Machine) -> None:
             settings.alert_mem_threshold,
         )
     else:
-        await _maybe_resolve(db, machine.id, TYPE_MEM_HIGH)
+        await resolve_alert(db, machine.id, TYPE_MEM_HIGH)
 
     # disk_full — 1 point, critique
     if latest.disk_pct > settings.alert_disk_threshold:
-        await _open_alert(
+        await open_alert(
             db,
             machine.id,
             TYPE_DISK_FULL,
@@ -101,17 +101,17 @@ async def check_threshold_alerts(db: AsyncSession, machine: Machine) -> None:
             settings.alert_disk_threshold,
         )
     else:
-        await _maybe_resolve(db, machine.id, TYPE_DISK_FULL)
+        await resolve_alert(db, machine.id, TYPE_DISK_FULL)
 
     # L'agent vient d'envoyer des métriques → résoudre l'alerte offline si présente
-    await _maybe_resolve(db, machine.id, TYPE_OFFLINE)
+    await resolve_alert(db, machine.id, TYPE_OFFLINE)
 
     await db.commit()
 
 
 async def resolve_offline_if_needed(db: AsyncSession, machine: Machine) -> None:
     """Appeler sur heartbeat : résoudre l'alerte offline le cas échéant."""
-    await _maybe_resolve(db, machine.id, TYPE_OFFLINE)
+    await resolve_alert(db, machine.id, TYPE_OFFLINE)
     await db.commit()
 
 
@@ -131,7 +131,7 @@ async def check_offline_machines(db: AsyncSession) -> None:
 
     for m in silent_machines:
         m.status = STATUS_OFFLINE
-        await _open_alert(
+        await open_alert(
             db,
             m.id,
             TYPE_OFFLINE,
@@ -145,9 +145,9 @@ async def check_offline_machines(db: AsyncSession) -> None:
         await db.commit()
 
 
-# ── helpers privés ────────────────────────────────────────────────────────────
+# ── primitives partagées (réutilisées par le service d'anomalies) ─────────────
 
-async def _open_alert(
+async def open_alert(
     db: AsyncSession,
     machine_id: int,
     type_: str,
@@ -187,7 +187,7 @@ async def _open_alert(
         )
 
 
-async def _maybe_resolve(db: AsyncSession, machine_id: int, type_: str) -> None:
+async def resolve_alert(db: AsyncSession, machine_id: int, type_: str) -> None:
     """Résoudre l'alerte ouverte de ce type si elle existe."""
     alert = await db.scalar(
         select(Alert).where(
