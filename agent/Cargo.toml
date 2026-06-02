@@ -18,7 +18,7 @@ chrono      = { version = "0.4", features = ["serde"] }
 ipnet       = "2"
 if-addrs    = "0.13"
 dns-lookup  = "2"
-csnmp       = "0.6"
+snmp2       = "0.5"   # SNMP v1/v2c/v3 (USM auth+priv), async tokio, features par défaut
 
 [profile.release]
 opt-level     = 3

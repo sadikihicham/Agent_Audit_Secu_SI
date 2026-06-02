@@ -40,9 +40,33 @@ pub struct SnmpConfig {
     #[serde(default)]
     pub enabled: bool,
 
+    /// Version SNMP : "v2c" (communauté) ou "v3" (USM auth/priv).
+    #[serde(default = "default_snmp_version")]
+    pub version: String,
+
     /// Communauté SNMP v2c (lecture seule).
     #[serde(default = "default_snmp_community")]
     pub community: String,
+
+    /// USM v3 — nom de sécurité (utilisateur).
+    #[serde(default)]
+    pub security_name: String,
+
+    /// USM v3 — mot de passe d'authentification (vide ⇒ noAuthNoPriv).
+    #[serde(default)]
+    pub auth_pass: String,
+
+    /// USM v3 — mot de passe de chiffrement (vide ⇒ authNoPriv).
+    #[serde(default)]
+    pub priv_pass: String,
+
+    /// USM v3 — protocole d'auth : md5|sha1|sha224|sha256|sha384|sha512.
+    #[serde(default = "default_snmp_auth_protocol")]
+    pub auth_protocol: String,
+
+    /// USM v3 — chiffrement : des|aes128.
+    #[serde(default = "default_snmp_cipher")]
+    pub cipher: String,
 
     /// Port SNMP de l'agent distant.
     #[serde(default = "default_snmp_port")]
@@ -65,8 +89,17 @@ pub struct SnmpConfig {
     pub concurrency: usize,
 }
 
+fn default_snmp_version() -> String {
+    "v2c".to_string()
+}
 fn default_snmp_community() -> String {
     "public".to_string()
+}
+fn default_snmp_auth_protocol() -> String {
+    "sha1".to_string()
+}
+fn default_snmp_cipher() -> String {
+    "aes128".to_string()
 }
 fn default_snmp_port() -> u16 {
     161
@@ -88,7 +121,13 @@ impl Default for SnmpConfig {
     fn default() -> Self {
         Self {
             enabled: false,
+            version: default_snmp_version(),
             community: default_snmp_community(),
+            security_name: String::new(),
+            auth_pass: String::new(),
+            priv_pass: String::new(),
+            auth_protocol: default_snmp_auth_protocol(),
+            cipher: default_snmp_cipher(),
             port: default_snmp_port(),
             timeout_ms: default_snmp_timeout_ms(),
             retries: default_snmp_retries(),

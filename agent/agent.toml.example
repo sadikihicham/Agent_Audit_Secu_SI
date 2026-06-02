@@ -49,7 +49,7 @@ concurrency = 256
 # les confronte à des blocklists embarquées + heuristiques (scan de ports, C2).
 # Aucune configuration supplémentaire n'est requise.
 
-# ── Enrichissement SNMP (v2c, lecture seule) ──────────────────────────────────
+# ── Enrichissement SNMP (v2c & v3, lecture seule) ─────────────────────────────
 # Après le scan TCP, interroge en UDP 161 les appareils découverts pour récupérer
 # des infos fiables : groupe système (description/OS, nom, uptime, emplacement,
 # contact) et table des interfaces réseau (ifTable : nom, statut, débit, octets).
@@ -58,9 +58,27 @@ concurrency = 256
 # Active l'enrichissement SNMP après chaque scan.
 enabled = false
 
+# Version : "v2c" (communauté) ou "v3" (USM, authentifié/chiffré).
+version = "v2c"
+
+# ── v2c ──
 # Communauté SNMP v2c en lecture seule (souvent « public »).
 community = "public"
 
+# ── v3 (USM) — utilisés seulement si version = "v3" ──
+# Niveau de sécurité déduit des mots de passe :
+#   auth_pass vide              → noAuthNoPriv
+#   auth_pass seul              → authNoPriv
+#   auth_pass + priv_pass       → authPriv (recommandé)
+security_name = ""
+auth_pass = ""
+priv_pass = ""
+# Protocole d'auth : md5 | sha1 | sha224 | sha256 | sha384 | sha512
+auth_protocol = "sha1"
+# Chiffrement (privacy) : des | aes128
+cipher = "aes128"
+
+# ── Commun ──
 # Port SNMP de l'agent distant (défaut : 161).
 port = 161
 
