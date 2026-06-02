@@ -48,3 +48,29 @@ concurrency = 256
 # aussi les flux sortants de l'hôte (/proc/net/tcp) et les envoie à l'API, qui
 # les confronte à des blocklists embarquées + heuristiques (scan de ports, C2).
 # Aucune configuration supplémentaire n'est requise.
+
+# ── Enrichissement SNMP (v2c, lecture seule) ──────────────────────────────────
+# Après le scan TCP, interroge en UDP 161 les appareils découverts pour récupérer
+# des infos fiables : groupe système (description/OS, nom, uptime, emplacement,
+# contact) et table des interfaces réseau (ifTable : nom, statut, débit, octets).
+# Complète le scan TCP, ne le remplace pas. Opt-in : désactivé par défaut.
+[snmp]
+# Active l'enrichissement SNMP après chaque scan.
+enabled = false
+
+# Communauté SNMP v2c en lecture seule (souvent « public »).
+community = "public"
+
+# Port SNMP de l'agent distant (défaut : 161).
+port = 161
+
+# Timeout par requête SNMP (ms) et nombre de tentatives supplémentaires.
+timeout_ms = 1500
+retries = 1
+
+# Collecter aussi la table des interfaces (ifTable). Plus lourd ; mettre à false
+# pour ne garder que le groupe système.
+collect_interfaces = true
+
+# Nombre d'appareils interrogés en parallèle.
+concurrency = 16

@@ -11,10 +11,12 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     DateTime,
     ForeignKey,
     String,
+    Text,
     UniqueConstraint,
     func,
 )
@@ -23,6 +25,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.db import Base
 
 if TYPE_CHECKING:
+    from app.models.device_interface import DeviceInterface
     from app.models.machine import Machine
 
 # Type d'appareil (heuristique : MAC vendor + hostname + ports).
@@ -73,4 +76,18 @@ class Device(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
+    # Enrichissement SNMP (NULL tant que l'appareil n'a pas répondu en SNMP).
+    snmp_reachable: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False
+    )
+    sys_descr: Mapped[str | None] = mapped_column(Text)
+    sys_uptime_secs: Mapped[int | None] = mapped_column(BigInteger)
+    sys_location: Mapped[str | None] = mapped_column(String(255))
+    sys_contact: Mapped[str | None] = mapped_column(String(255))
+
     discovered_by: Mapped[Machine] = relationship()
+    interfaces: Mapped[list[DeviceInterface]] = relationship(
+        back_populates="device",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )

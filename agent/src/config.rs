@@ -23,6 +23,79 @@ pub struct Config {
     /// Configuration du scan réseau (section [scan]).
     #[serde(default)]
     pub scan: ScanConfig,
+
+    /// Configuration de l'enrichissement SNMP (section [snmp]).
+    #[serde(default)]
+    pub snmp: SnmpConfig,
+}
+
+/// Configuration de l'enrichissement SNMP (v2c, lecture seule).
+///
+/// Après le scan TCP, on interroge en UDP 161 les appareils découverts pour
+/// récupérer le groupe système (sysDescr/sysName/sysUpTime/…) et, en option, la
+/// table des interfaces (ifTable). Opt-in : désactivé par défaut.
+#[derive(Debug, Deserialize, Clone)]
+pub struct SnmpConfig {
+    /// Active l'enrichissement SNMP après le scan (désactivé par défaut — opt-in).
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// Communauté SNMP v2c (lecture seule).
+    #[serde(default = "default_snmp_community")]
+    pub community: String,
+
+    /// Port SNMP de l'agent distant.
+    #[serde(default = "default_snmp_port")]
+    pub port: u16,
+
+    /// Timeout par requête SNMP (millisecondes).
+    #[serde(default = "default_snmp_timeout_ms")]
+    pub timeout_ms: u64,
+
+    /// Nombre de tentatives supplémentaires en cas de non-réponse.
+    #[serde(default = "default_snmp_retries")]
+    pub retries: usize,
+
+    /// Collecte aussi la table des interfaces (ifTable). Plus lourd.
+    #[serde(default = "default_true")]
+    pub collect_interfaces: bool,
+
+    /// Nombre d'appareils interrogés en parallèle.
+    #[serde(default = "default_snmp_concurrency")]
+    pub concurrency: usize,
+}
+
+fn default_snmp_community() -> String {
+    "public".to_string()
+}
+fn default_snmp_port() -> u16 {
+    161
+}
+fn default_snmp_timeout_ms() -> u64 {
+    1500
+}
+fn default_snmp_retries() -> usize {
+    1
+}
+fn default_true() -> bool {
+    true
+}
+fn default_snmp_concurrency() -> usize {
+    16
+}
+
+impl Default for SnmpConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            community: default_snmp_community(),
+            port: default_snmp_port(),
+            timeout_ms: default_snmp_timeout_ms(),
+            retries: default_snmp_retries(),
+            collect_interfaces: true,
+            concurrency: default_snmp_concurrency(),
+        }
+    }
 }
 
 /// Configuration du scan réseau (Phase A : découverte d'appareils).
@@ -114,6 +187,7 @@ impl Default for Config {
             interval_secs: default_interval(),
             max_queue_size: default_max_queue(),
             scan: ScanConfig::default(),
+            snmp: SnmpConfig::default(),
         }
     }
 }

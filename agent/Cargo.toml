@@ -18,6 +18,7 @@ chrono      = { version = "0.4", features = ["serde"] }
 ipnet       = "2"
 if-addrs    = "0.13"
 dns-lookup  = "2"
+csnmp       = "0.6"
 
 [profile.release]
 opt-level     = 3

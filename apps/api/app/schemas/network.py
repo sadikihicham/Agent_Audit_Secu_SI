@@ -19,6 +19,20 @@ class ScanPort(BaseModel):
     banner: str | None = Field(default=None, max_length=2048)
 
 
+class ScanInterface(BaseModel):
+    """Une interface réseau relevée par SNMP (ifTable)."""
+
+    if_index: int
+    name: str | None = Field(default=None, max_length=255)
+    mac: str | None = Field(default=None, max_length=17)
+    admin_up: bool | None = None
+    oper_up: bool | None = None
+    speed_bps: int | None = Field(default=None, ge=0)
+    mtu: int | None = None
+    in_octets: int | None = Field(default=None, ge=0)
+    out_octets: int | None = Field(default=None, ge=0)
+
+
 class ScanDevice(BaseModel):
     """Un appareil tel que rapporté par le scan d'un agent."""
 
@@ -31,6 +45,14 @@ class ScanDevice(BaseModel):
     is_gateway: bool = False
     status: Literal["up", "down"] = "up"
     ports: list[ScanPort] = Field(default_factory=list, max_length=512)
+    # Enrichissement SNMP (optionnel ; défauts si SNMP désactivé/injoignable).
+    sys_descr: str | None = Field(default=None, max_length=1024)
+    sys_name: str | None = Field(default=None, max_length=255)
+    sys_uptime_secs: int | None = Field(default=None, ge=0)
+    sys_location: str | None = Field(default=None, max_length=255)
+    sys_contact: str | None = Field(default=None, max_length=255)
+    snmp_reachable: bool = False
+    interfaces: list[ScanInterface] = Field(default_factory=list, max_length=512)
 
 
 class ScanRequest(BaseModel):
@@ -105,10 +127,33 @@ class DeviceOut(BaseModel):
     status: str
     first_seen_at: datetime
     last_seen_at: datetime
+    # Enrichissement SNMP (NULL si l'appareil n'a pas répondu en SNMP).
+    snmp_reachable: bool = False
+    sys_descr: str | None = None
+    sys_uptime_secs: int | None = None
+    sys_location: str | None = None
+    sys_contact: str | None = None
     # Calculés (attributs injectés par le routeur à partir des ports/vulns).
     risk: DeviceRisk = "safe"
     open_ports: int = 0
     vuln_count: int = 0
+
+
+class InterfaceOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    device_id: int
+    if_index: int
+    name: str | None
+    mac: str | None
+    admin_up: bool | None
+    oper_up: bool | None
+    speed_bps: int | None
+    mtu: int | None
+    in_octets: int | None
+    out_octets: int | None
+    last_seen_at: datetime
 
 
 class PortOut(BaseModel):

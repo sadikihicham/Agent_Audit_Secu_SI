@@ -7,17 +7,44 @@ import { getToken } from "@/lib/auth";
 import {
   DeviceStatusBadge,
   DeviceRiskBadge,
+  DeviceTypeIcon,
   VulnSeverityBadge,
   deviceTypeLabel,
   eventKindLabel,
 } from "@/components/network-state";
 import type {
   Device,
+  DeviceInterface,
   DevicePort,
   DeviceStatus,
   NetworkEventItem,
   Vuln,
 } from "@/lib/types";
+
+// ── Formateurs SNMP ───────────────────────────────────────────────────────────
+
+function formatUptime(secs: number): string {
+  const d = Math.floor(secs / 86400);
+  const h = Math.floor((secs % 86400) / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  if (d > 0) return `${d} j ${h} h`;
+  if (h > 0) return `${h} h ${m} min`;
+  return `${m} min`;
+}
+
+function formatBytes(n: number): string {
+  if (n <= 0) return "0 o";
+  const units = ["o", "Ko", "Mo", "Go", "To", "Po"];
+  const i = Math.min(Math.floor(Math.log(n) / Math.log(1024)), units.length - 1);
+  return `${(n / 1024 ** i).toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+}
+
+function formatSpeed(bps: number): string {
+  if (bps <= 0) return "—";
+  const units = ["bit/s", "Kbit/s", "Mbit/s", "Gbit/s", "Tbit/s"];
+  const i = Math.min(Math.floor(Math.log(bps) / Math.log(1000)), units.length - 1);
+  return `${(bps / 1000 ** i).toFixed(i <= 1 ? 0 : 1)} ${units[i]}`;
+}
 
 function Field({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
@@ -60,6 +87,13 @@ export default function DevicePage() {
     refetchInterval: 30_000,
   });
 
+  const { data: interfaces = [] } = useQuery<DeviceInterface[]>({
+    queryKey: ["device-interfaces", id],
+    queryFn: () =>
+      apiFetch<DeviceInterface[]>(`/network/devices/${id}/interfaces`, token),
+    refetchInterval: 30_000,
+  });
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -70,14 +104,27 @@ export default function DevicePage() {
         >
           ← Retour
         </button>
-        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
-          {device?.hostname ?? device?.ip ?? "…"}
-        </h1>
+        {device && <DeviceTypeIcon type={device.device_type} size="lg" />}
+        <div>
+          <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
+            {device?.hostname ?? device?.ip ?? "…"}
+          </h1>
+          {device && (
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              {deviceTypeLabel(device.device_type)}
+            </p>
+          )}
+        </div>
         {device && <DeviceStatusBadge status={device.status as DeviceStatus} />}
         {device && <DeviceRiskBadge risk={device.risk} />}
         {device?.is_gateway && (
           <span className="rounded bg-sky-500/15 px-2 py-0.5 text-xs text-sky-600 dark:text-sky-300">
             passerelle
+          </span>
+        )}
+        {device?.snmp_reachable && (
+          <span className="rounded bg-violet-500/15 px-2 py-0.5 text-xs text-violet-600 dark:text-violet-300">
+            SNMP
           </span>
         )}
       </div>
@@ -103,6 +150,20 @@ export default function DevicePage() {
               label="Dernière détection"
               value={new Date(device.last_seen_at).toLocaleString("fr-FR")}
             />
+            {device.snmp_reachable && (
+              <>
+                <Field
+                  label="Uptime (SNMP)"
+                  value={
+                    device.sys_uptime_secs != null
+                      ? formatUptime(device.sys_uptime_secs)
+                      : "—"
+                  }
+                />
+                <Field label="Emplacement (SNMP)" value={device.sys_location ?? "—"} />
+                <Field label="Contact (SNMP)" value={device.sys_contact ?? "—"} />
+              </>
+            )}
           </div>
 
           {/* Vulnérabilités */}
@@ -189,6 +250,73 @@ export default function DevicePage() {
               </div>
             )}
           </section>
+
+          {/* Interfaces réseau (SNMP) */}
+          {interfaces.length > 0 && (
+            <section className="space-y-3">
+              <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                Interfaces réseau{" "}
+                <span className="text-slate-400">({interfaces.length})</span>
+                <span className="ml-2 rounded bg-violet-500/15 px-1.5 py-0.5 text-[10px] font-normal text-violet-600 dark:text-violet-300">
+                  SNMP
+                </span>
+              </h2>
+              <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700/50">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200 bg-slate-100 dark:border-slate-700/50 dark:bg-slate-800/60">
+                      {["#", "Nom", "MAC", "Statut", "Débit", "MTU", "Entrant", "Sortant"].map(
+                        (h) => (
+                          <th
+                            key={h}
+                            className="px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400"
+                          >
+                            {h}
+                          </th>
+                        ),
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 dark:divide-slate-700/30">
+                    {interfaces.map((it) => (
+                      <tr
+                        key={it.id}
+                        className="bg-white hover:bg-slate-50 dark:bg-transparent dark:hover:bg-slate-800/30"
+                      >
+                        <td className="px-4 py-3 font-mono text-xs text-slate-500">{it.if_index}</td>
+                        <td className="px-4 py-3 text-xs text-slate-700 dark:text-slate-300">
+                          {it.name ?? "—"}
+                        </td>
+                        <td className="px-4 py-3 font-mono text-xs text-slate-500">{it.mac ?? "—"}</td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs ${
+                              it.oper_up
+                                ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300"
+                                : "bg-slate-500/15 text-slate-500 dark:text-slate-400"
+                            }`}
+                          >
+                            <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                            {it.oper_up ? "up" : "down"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-slate-500">
+                          {it.speed_bps != null ? formatSpeed(it.speed_bps) : "—"}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-slate-500">{it.mtu ?? "—"}</td>
+                        <td className="px-4 py-3 text-xs text-slate-500">
+                          {it.in_octets != null ? formatBytes(it.in_octets) : "—"}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-slate-500">
+                          {it.out_octets != null ? formatBytes(it.out_octets) : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
 
           {/* Événements récents */}
           <section className="space-y-3">

@@ -38,6 +38,20 @@ pub struct ScanPort {
     pub banner: Option<String>,
 }
 
+/// Une interface réseau d'un appareil, relevée par SNMP (ifTable).
+#[derive(Debug, Clone, Serialize)]
+pub struct ScanInterface {
+    pub if_index: i32,
+    pub name: Option<String>,
+    pub mac: Option<String>,
+    pub admin_up: Option<bool>,
+    pub oper_up: Option<bool>,
+    pub speed_bps: Option<i64>,
+    pub mtu: Option<i32>,
+    pub in_octets: Option<i64>,
+    pub out_octets: Option<i64>,
+}
+
 /// Un appareil découvert, prêt à être envoyé à `POST /ingest/scan`.
 #[derive(Debug, Clone, Serialize)]
 pub struct ScanDevice {
@@ -50,6 +64,15 @@ pub struct ScanDevice {
     pub is_gateway: bool,
     pub status: String,
     pub ports: Vec<ScanPort>,
+    // Enrichissement SNMP (rempli ultérieurement par le module `snmp` ; valeurs
+    // par défaut si SNMP désactivé ou appareil injoignable).
+    pub sys_descr: Option<String>,
+    pub sys_name: Option<String>,
+    pub sys_uptime_secs: Option<i64>,
+    pub sys_location: Option<String>,
+    pub sys_contact: Option<String>,
+    pub snmp_reachable: bool,
+    pub interfaces: Vec<ScanInterface>,
 }
 
 /// Exécute un scan complet du périmètre autorisé et renvoie les appareils vivants.
@@ -190,6 +213,13 @@ pub async fn run_scan(cfg: &ScanConfig) -> Vec<ScanDevice> {
             is_gateway,
             status: "up".to_string(),
             ports,
+            sys_descr: None,
+            sys_name: None,
+            sys_uptime_secs: None,
+            sys_location: None,
+            sys_contact: None,
+            snmp_reachable: false,
+            interfaces: Vec::new(),
         });
     }
 

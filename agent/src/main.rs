@@ -3,6 +3,7 @@ mod config;
 mod flows;
 mod netscan;
 mod queue;
+mod snmp;
 mod state;
 mod transport;
 
@@ -147,11 +148,16 @@ async fn scan_loop(client: reqwest::Client, config: Config, state: AgentState) {
     loop {
         interval.tick().await;
 
-        let devices = netscan::run_scan(&config.scan).await;
+        let mut devices = netscan::run_scan(&config.scan).await;
         info!(
             "Scan réseau terminé : {} appareil(s) découvert(s)",
             devices.len()
         );
+
+        // Enrichissement SNMP (opt-in) : groupe système + interfaces (ifTable).
+        if config.snmp.enabled {
+            snmp::enrich(&mut devices, &config.snmp).await;
+        }
 
         let cidr = if config.scan.allowlist.is_empty() {
             None

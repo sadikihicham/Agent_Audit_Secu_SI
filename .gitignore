@@ -30,3 +30,4 @@ agent/target/
 
 # Docker
 *.pid
+.gstack/

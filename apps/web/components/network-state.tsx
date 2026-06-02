@@ -99,7 +99,124 @@ export function DeviceRiskBadge({ risk }: { risk: DeviceRisk }) {
   );
 }
 
-// ── Type d'appareil ──────────────────────────────────────────────────────────
+// ── Type d'appareil : icône illustrée ────────────────────────────────────────
+
+// Couleur de fond (teinte) par type, déclinée clair/sombre.
+const DEVICE_TYPE_TINT: Record<string, string> = {
+  router: "bg-sky-500/15 text-sky-600 dark:text-sky-300",
+  server: "bg-violet-500/15 text-violet-600 dark:text-violet-300",
+  workstation: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300",
+  printer: "bg-amber-500/15 text-amber-600 dark:text-amber-300",
+  phone: "bg-pink-500/15 text-pink-600 dark:text-pink-300",
+  iot: "bg-teal-500/15 text-teal-600 dark:text-teal-300",
+  nas: "bg-indigo-500/15 text-indigo-600 dark:text-indigo-300",
+  unknown: "bg-slate-500/15 text-slate-500 dark:text-slate-400",
+};
+
+// Tracés SVG (style trait, viewBox 24×24) pour chaque type d'appareil.
+function DeviceTypeGlyph({ type }: { type: string }) {
+  switch (type) {
+    case "router":
+      return (
+        <>
+          <rect width="20" height="8" x="2" y="14" rx="2" />
+          <path d="M6.01 18H6" />
+          <path d="M10.01 18H10" />
+          <path d="M15 10v4" />
+          <path d="M17.84 7.17a4 4 0 0 0-5.66 0" />
+          <path d="M20.66 4.34a8 8 0 0 0-11.31 0" />
+        </>
+      );
+    case "server":
+    case "nas":
+      return (
+        <>
+          <rect width="20" height="8" x="2" y="2" rx="2" ry="2" />
+          <rect width="20" height="8" x="2" y="14" rx="2" ry="2" />
+          <line x1="6" x2="6.01" y1="6" y2="6" />
+          <line x1="6" x2="6.01" y1="18" y2="18" />
+        </>
+      );
+    case "workstation":
+      // poste de travail / PC portable
+      return (
+        <path d="M20 16V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9m16 0H4m16 0 1.28 2.55a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45L4 16" />
+      );
+    case "printer":
+      return (
+        <>
+          <path d="M6 9V2h12v7" />
+          <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+          <rect width="12" height="8" x="6" y="14" />
+        </>
+      );
+    case "phone":
+      return (
+        <>
+          <rect width="14" height="20" x="5" y="2" rx="2" ry="2" />
+          <path d="M12 18h.01" />
+        </>
+      );
+    case "iot":
+      return (
+        <>
+          <rect width="16" height="16" x="4" y="4" rx="2" />
+          <rect width="6" height="6" x="9" y="9" rx="1" />
+          <path d="M15 2v2" />
+          <path d="M15 20v2" />
+          <path d="M2 15h2" />
+          <path d="M2 9h2" />
+          <path d="M20 15h2" />
+          <path d="M20 9h2" />
+          <path d="M9 2v2" />
+          <path d="M9 20v2" />
+        </>
+      );
+    default:
+      // inconnu
+      return (
+        <>
+          <circle cx="12" cy="12" r="10" />
+          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+          <path d="M12 17h.01" />
+        </>
+      );
+  }
+}
+
+const ICON_SIZE = { sm: "h-8 w-8", md: "h-10 w-10", lg: "h-14 w-14" } as const;
+const GLYPH_SIZE = { sm: "h-4 w-4", md: "h-5 w-5", lg: "h-7 w-7" } as const;
+
+export function DeviceTypeIcon({
+  type,
+  size = "md",
+  title,
+}: {
+  type: string;
+  size?: "sm" | "md" | "lg";
+  title?: string;
+}) {
+  const tint = DEVICE_TYPE_TINT[type] ?? DEVICE_TYPE_TINT.unknown;
+  return (
+    <span
+      title={title ?? deviceTypeLabel(type)}
+      className={`inline-flex shrink-0 items-center justify-center rounded-lg ${ICON_SIZE[size]} ${tint}`}
+    >
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.75}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className={GLYPH_SIZE[size]}
+        aria-hidden="true"
+      >
+        <DeviceTypeGlyph type={type} />
+      </svg>
+    </span>
+  );
+}
 
 // ── Sévérité d'une vulnérabilité ─────────────────────────────────────────────
 

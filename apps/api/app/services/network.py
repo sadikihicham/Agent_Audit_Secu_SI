@@ -19,6 +19,7 @@ from app.models.device import (
     STATUS_UP,
     Device,
 )
+from app.models.device_interface import DeviceInterface
 from app.models.device_port import DevicePort
 from app.models.device_vuln import DeviceVuln
 from app.models.machine import Machine
@@ -108,6 +109,14 @@ async def ingest_scan(
         dev.is_gateway = sd.is_gateway
         dev.status = sd.status
         dev.last_seen_at = now
+        # Enrichissement SNMP : ne réécrase pas les anciennes valeurs si ce scan
+        # n'a pas joint l'appareil en SNMP (snmp_reachable=False).
+        if sd.snmp_reachable:
+            dev.snmp_reachable = True
+            dev.sys_descr = sd.sys_descr
+            dev.sys_uptime_secs = sd.sys_uptime_secs
+            dev.sys_location = sd.sys_location
+            dev.sys_contact = sd.sys_contact
         # id est None tant que pas flush ; on suit via l'objet, pas l'id.
         touched.add(id(dev))
         present.append((dev, sd, is_new))
@@ -119,6 +128,9 @@ async def ingest_scan(
         await _sync_ports_and_vulns(
             db, dev, sd, now, emit_new_ports=had_baseline and not is_new
         )
+        # Interfaces SNMP : remplacées uniquement si ce scan en a relevé.
+        if sd.snmp_reachable and sd.interfaces:
+            await _sync_interfaces(db, dev, sd, now)
         if is_new and had_baseline:
             label = f" ({sd.hostname})" if sd.hostname else ""
             await events.record_event(
@@ -368,6 +380,40 @@ async def _sync_ports_and_vulns(
                 description=f["description"],
                 source=f["source"],
                 detected_at=now,
+            )
+        )
+
+
+async def _sync_interfaces(
+    db: AsyncSession, device: Device, sd: ScanDevice, now: datetime
+) -> None:
+    """Recalcule les interfaces SNMP d'un appareil (approche delete + insert).
+
+    Comme pour les ports, les interfaces reflètent toujours le dernier scan SNMP.
+    Appelée seulement quand le scan a effectivement relevé des interfaces.
+    """
+    await db.execute(
+        delete(DeviceInterface).where(DeviceInterface.device_id == device.id)
+    )
+    seen: set[int] = set()
+    for iface in sd.interfaces:
+        # Dédup défensif sur ifIndex (contrainte unique device_id+if_index).
+        if iface.if_index in seen:
+            continue
+        seen.add(iface.if_index)
+        db.add(
+            DeviceInterface(
+                device_id=device.id,
+                if_index=iface.if_index,
+                name=iface.name,
+                mac=iface.mac,
+                admin_up=iface.admin_up,
+                oper_up=iface.oper_up,
+                speed_bps=iface.speed_bps,
+                mtu=iface.mtu,
+                in_octets=iface.in_octets,
+                out_octets=iface.out_octets,
+                last_seen_at=now,
             )
         )
 

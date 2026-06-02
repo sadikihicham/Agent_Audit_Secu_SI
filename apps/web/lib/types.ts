@@ -68,9 +68,29 @@ export type Device = {
   status: DeviceStatus;
   first_seen_at: string;
   last_seen_at: string;
+  snmp_reachable: boolean;
+  sys_descr: string | null;
+  sys_uptime_secs: number | null;
+  sys_location: string | null;
+  sys_contact: string | null;
   risk: DeviceRisk;
   open_ports: number;
   vuln_count: number;
+};
+
+export type DeviceInterface = {
+  id: number;
+  device_id: number;
+  if_index: number;
+  name: string | null;
+  mac: string | null;
+  admin_up: boolean | null;
+  oper_up: boolean | null;
+  speed_bps: number | null;
+  mtu: number | null;
+  in_octets: number | null;
+  out_octets: number | null;
+  last_seen_at: string;
 };
 
 export type DevicePort = {

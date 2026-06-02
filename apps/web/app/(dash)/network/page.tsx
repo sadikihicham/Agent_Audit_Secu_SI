@@ -11,6 +11,7 @@ import {
   NETWORK_STATE_META,
   DeviceStatusBadge,
   DeviceRiskBadge,
+  DeviceTypeIcon,
   deviceTypeLabel,
 } from "@/components/network-state";
 import type { Device, DeviceStatus, NetworkSummary } from "@/lib/types";
@@ -202,17 +203,22 @@ export default function NetworkPage() {
                   className="bg-white hover:bg-slate-50 dark:bg-transparent dark:hover:bg-slate-800/30"
                 >
                   <td className="px-4 py-3">
-                    <Link
-                      href={`/network/${d.id}`}
-                      className="font-medium text-slate-900 hover:text-sky-600 dark:text-slate-100 dark:hover:text-sky-400"
-                    >
-                      {d.hostname ?? "—"}
-                    </Link>
-                    {d.is_gateway && (
-                      <span className="ml-2 rounded bg-sky-500/15 px-1.5 py-0.5 text-[10px] text-sky-600 dark:text-sky-300">
-                        passerelle
-                      </span>
-                    )}
+                    <div className="flex items-center gap-3">
+                      <DeviceTypeIcon type={d.device_type} size="sm" />
+                      <div className="min-w-0">
+                        <Link
+                          href={`/network/${d.id}`}
+                          className="font-medium text-slate-900 hover:text-sky-600 dark:text-slate-100 dark:hover:text-sky-400"
+                        >
+                          {d.hostname ?? "—"}
+                        </Link>
+                        {d.is_gateway && (
+                          <span className="ml-2 rounded bg-sky-500/15 px-1.5 py-0.5 text-[10px] text-sky-600 dark:text-sky-300">
+                            passerelle
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </td>
                   <td className="px-4 py-3 font-mono text-xs text-slate-700 dark:text-slate-300">{d.ip}</td>
                   <td className="px-4 py-3 font-mono text-xs text-slate-500">{d.mac ?? "—"}</td>

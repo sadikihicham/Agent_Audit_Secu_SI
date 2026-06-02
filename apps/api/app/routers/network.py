@@ -6,10 +6,18 @@ from sqlalchemy import select
 
 from app.deps import CurrentUser, DbSession
 from app.models.device import Device
+from app.models.device_interface import DeviceInterface
 from app.models.device_port import DevicePort
 from app.models.device_vuln import DeviceVuln
 from app.models.network_event import STATUS_ACK, NetworkEvent
-from app.schemas.network import DeviceOut, EventOut, NetworkSummary, PortOut, VulnOut
+from app.schemas.network import (
+    DeviceOut,
+    EventOut,
+    InterfaceOut,
+    NetworkSummary,
+    PortOut,
+    VulnOut,
+)
 from app.services import network, vuln
 
 router = APIRouter(prefix="/network", tags=["network"])
@@ -63,6 +71,20 @@ async def list_device_ports(
             select(DevicePort)
             .where(DevicePort.device_id == device_id)
             .order_by(DevicePort.port.asc())
+        )
+    )
+
+
+@router.get("/devices/{device_id}/interfaces", response_model=list[InterfaceOut])
+async def list_device_interfaces(
+    device_id: int, db: DbSession, _user: CurrentUser
+) -> list[DeviceInterface]:
+    """Interfaces réseau d'un appareil relevées par SNMP (par ifIndex croissant)."""
+    return list(
+        await db.scalars(
+            select(DeviceInterface)
+            .where(DeviceInterface.device_id == device_id)
+            .order_by(DeviceInterface.if_index.asc())
         )
     )
 
