@@ -1,4 +1,6 @@
 # ── Build stage ───────────────────────────────────────────────────────────────
+# `rust:latest` est basé sur Debian trixie (glibc 2.41). Le runtime ci-dessous
+# doit utiliser la même base (trixie) pour éviter « GLIBC_2.x not found ».
 FROM rust:latest AS builder
 
 WORKDIR /build
@@ -17,7 +19,8 @@ COPY src ./src
 RUN touch src/main.rs && cargo build --release
 
 # ── Runtime stage ─────────────────────────────────────────────────────────────
-FROM debian:bookworm-slim
+# trixie-slim : même base Debian que le builder (rust:latest) → glibc compatible.
+FROM debian:trixie-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
