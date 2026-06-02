@@ -28,8 +28,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>("dark");
 
   // Synchronise l'état React avec ce que le script anti-FOUC a déjà appliqué.
+  // setState au montage est volontaire ici : le thème réel (localStorage) n'est
+  // connu que côté client, et l'init serveur reste "dark" pour éviter un mismatch
+  // d'hydratation (une lazy-init le provoquerait). La règle est donc inapplicable.
   useEffect(() => {
     const t = initialTheme();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTheme(t);
     apply(t);
   }, []);
