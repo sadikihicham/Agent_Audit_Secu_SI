@@ -17,7 +17,10 @@ export function useRealtimeEvents(
   onEvent: (e: RealtimeEvent) => void,
 ): void {
   const cbRef = useRef(onEvent);
-  cbRef.current = onEvent;
+  // Garder la ref à jour hors du render (callback stable → pas de reconnexion).
+  useEffect(() => {
+    cbRef.current = onEvent;
+  }, [onEvent]);
 
   useEffect(() => {
     const token = getToken();
