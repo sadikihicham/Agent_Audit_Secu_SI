@@ -16,7 +16,7 @@ tracing     = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 chrono      = { version = "0.4", features = ["serde"] }
 ipnet       = "2"
-if-addrs    = "0.13"
+if-addrs    = "0.15"
 dns-lookup  = "2"
 snmp2       = "0.5"   # SNMP v1/v2c/v3 (USM auth+priv), async tokio, features par défaut
 
