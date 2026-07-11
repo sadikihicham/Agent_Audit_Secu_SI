@@ -34,8 +34,13 @@ services:
     # Pas de montage du code source, pas de --reload (image immuable).
     # Nombre de workers configurable via API_WORKERS (défaut 2). Sûr car l'API
     # est sans état : la tâche périodique vit dans le service `scheduler`.
+    # --proxy-headers + --forwarded-allow-ips='*' : fait confiance au X-Forwarded-For posé par
+    # Caddy (seul service en amont sur ce réseau docker, `api` n'a aucun port publié sur l'hôte)
+    # pour que request.client.host reflète la VRAIE IP cliente — sinon le rate-limiter de login
+    # (app/core/ratelimit.py) verrait toujours l'IP interne de Caddy et confondrait tous les
+    # clients dans la même clé de quota (bypass total du rate-limit une fois l'API exposée).
     volumes: !override []
-    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "${API_WORKERS:-2}"]
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "${API_WORKERS:-2}", "--proxy-headers", "--forwarded-allow-ips=*"]
     ports: !override []
     environment:
       ENVIRONMENT: production

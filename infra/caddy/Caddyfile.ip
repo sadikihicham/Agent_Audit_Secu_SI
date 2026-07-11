@@ -1,0 +1,44 @@
+# Variante TEMPORAIRE — accès par l'IP publique du serveur, avant que le DNS soit posé.
+# `$DOMAIN` contient ici l'IP du serveur (ex. 203.0.113.10), PAS un nom de domaine.
+#
+# TLS auto-signé (directive `tls internal`, CA interne Caddy) : Let's Encrypt est IMPOSSIBLE
+# sans nom de domaine résolvable (ACME ne délivre pas de certificat pour une IP nue côté
+# autorité publique). Avertissement navigateur ATTENDU et normal en attendant le DNS.
+#
+# Pas de sous-domaine possible sur une IP nue (contrairement au Caddyfile normal,
+# api.{$DOMAIN}) → distinction dashboard / API par PORT plutôt que par nom d'hôte.
+#
+# Ports configurables via $DASHBOARD_PORT / $API_PORT (défaut 443/8443 sur un serveur DÉDIÉ ;
+# à surcharger — ex. 8443/9443 — si 80/443 sont déjà pris par un autre service sur le même hôte,
+# cf. docker-compose.prod-ip.yml).
+#
+#   Dashboard : https://<IP>:<DASHBOARD_PORT>/
+#   API       : https://<IP>:<API_PORT>/       (REST + WebSocket /ws)
+#
+# À REMPLACER dès que le DNS est posé : retirer cette surcouche
+# (docker-compose.prod-ip.yml), définir DOMAIN=<domaine réel> dans .env, relancer avec le
+# Caddyfile normal (Let's Encrypt automatique) — cf. docs/runbook.md §8.
+
+https://{$DOMAIN}:{$DASHBOARD_PORT} {
+	tls internal
+	encode gzip
+	reverse_proxy web:3000
+}
+
+https://{$DOMAIN}:{$API_PORT} {
+	tls internal
+	encode gzip
+	reverse_proxy {
+		dynamic a {
+			name api
+			port 8000
+			refresh 5s
+			resolvers 127.0.0.11
+		}
+		lb_policy round_robin
+		lb_try_duration 5s
+		lb_try_interval 250ms
+		fail_duration 10s
+		max_fails 1
+	}
+}

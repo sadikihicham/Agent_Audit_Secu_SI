@@ -1,0 +1,25 @@
+[Unit]
+Description=GuardianOps AI — agent de collecte (métriques hôte + réseau)
+Documentation=https://github.com/sadikihicham/Agent_Audit_Secu_SI
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=guardianops
+Group=guardianops
+WorkingDirectory=/opt/guardianops-agent
+ExecStart=/opt/guardianops-agent/guardianops-agent
+Restart=on-failure
+RestartSec=5
+
+# Durcissement — pas de capacités réseau spéciales requises : le scan (Phase A/B/C) est
+# rootless (TCP-connect + lecture de /proc/net/arp et /proc/net/tcp), cf. docs/runbook.md §9.
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/opt/guardianops-agent
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

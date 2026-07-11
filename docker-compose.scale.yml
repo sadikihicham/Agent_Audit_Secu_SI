@@ -19,6 +19,9 @@ services:
     # Un nom de conteneur fixe empêche la mise à l'échelle → on le retire.
     container_name: !reset null
     # Une seule instance uvicorn par réplique (la réplication assure le parallélisme).
-    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    # Mêmes flags --proxy-headers que docker-compose.prod.yml (ce `command` REMPLACE entièrement
+    # celui de la surcouche prod, pas de fusion) — sinon le rate-limiter de login perd la vraie IP
+    # cliente dès qu'on scale (cf. docker-compose.prod.yml, service api).
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips=*"]
     deploy:
       replicas: ${API_REPLICAS:-3}

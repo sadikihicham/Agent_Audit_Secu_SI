@@ -152,6 +152,11 @@ docker compose down -v        # ⚠ supprime le volume DB
 ## 7. Notes de sécurité (déploiement)
 
 - `JWT_SECRET` validé au démarrage (refus des valeurs faibles/par défaut, min 32 car.).
+- **Anti brute-force sur `/auth/login`** (`app/core/ratelimit.py`) : 5 échecs / 5 min par IP
+  (fenêtre glissante, sorted set Redis) → `429` + `Retry-After`, **avant** toute vérification
+  d'identifiants. Un succès réinitialise le compteur. **Fail-open** sur panne Redis (une panne
+  d'infra ne verrouille jamais la seule voie d'accès admin). Devient un prérequis dès que l'API
+  est exposée publiquement (cf. §8) — un seul compte admin, sans MFA à ce jour.
 - WebSocket : authentification par **ticket à usage unique** (`POST /ws/ticket`, TTL 30 s)
   — le JWT ne transite jamais dans une URL (donc jamais dans les access logs).
 - Tokens d'enrôlement stockés **hashés** (sha256), affichés en clair une seule fois.
@@ -197,6 +202,55 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml exec api \
 ```
 
 > Nécessite Docker Compose ≥ 2.24 (tag de fusion `!override` pour retirer les ports).
+
+### Variante : déployer via l'IP du serveur, avant que le DNS soit posé
+
+Le lancement ci-dessus **exige** un DNS déjà pointé (Let's Encrypt ne délivre pas de certificat
+pour une IP nue). Pour ne pas bloquer le déploiement en attendant la propagation DNS, surcouche
+temporaire `docker-compose.prod-ip.yml` : TLS **auto-signé** (`tls internal`), pas de sous-domaine
+(impossible sur une IP nue) → dashboard et API distingués **par port** au lieu du nom d'hôte.
+
+```dotenv
+DOMAIN=203.0.113.10                    # l'IP du serveur, réutilise la même variable
+JWT_SECRET=<valeur forte ≥ 32 car.>
+POSTGRES_USER=…  POSTGRES_PASSWORD=<fort>  POSTGRES_DB=…
+REDIS_PASSWORD=<fort>
+```
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+               -f docker-compose.prod-ip.yml up -d --build
+docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.prod-ip.yml \
+  exec api alembic upgrade head
+docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.prod-ip.yml \
+  exec api python -m app.cli create-admin admin@example.com '<motdepasse>'
+```
+
+- Dashboard : `https://<IP>:${DASHBOARD_PORT:-443}/` · API : `https://<IP>:${API_PORT:-8443}/` —
+  **avertissement navigateur attendu** (certificat auto-signé, normal en attendant le DNS).
+- Le rate-limiter de login (§7) et le `--proxy-headers` (§8) restent actifs à l'identique — hérités
+  de `docker-compose.prod.yml`, cette surcouche ne touche que `proxy` et `web`.
+
+**Co-hébergement avec un autre service sur le même serveur** (80/443 déjà pris — ex. un autre
+site derrière son propre Caddy) : surcharger `DASHBOARD_PORT`/`API_PORT` dans `.env` :
+```dotenv
+DOMAIN=203.0.113.10
+DASHBOARD_PORT=8443            # au lieu de 443, déjà pris par l'autre service
+API_PORT=9443                  # au lieu de 8443
+```
+Aucun autre changement — `docker-compose.prod-ip.yml` republie les ports demandés et les
+propage au Caddyfile. Vérifier au préalable qu'ils ne sont pas eux-mêmes déjà occupés
+(`sudo ss -tlnp | grep -E ':8443|:9443'`) et que le pare-feu les autorise (`sudo ufw allow
+8443/tcp && sudo ufw allow 9443/tcp`).
+
+**Bascule vers le domaine réel dès que le DNS est prêt** — aucune perte de données, juste une
+reconfiguration réseau :
+```bash
+# 1. Poser les DNS A : mon-domaine.com + api.mon-domaine.com → IP du serveur
+# 2. .env : DOMAIN=mon-domaine.com (remplace l'IP)
+# 3. Relancer SANS la surcouche -ip (retour au Caddyfile normal, Let's Encrypt automatique)
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build proxy web
+```
 
 ### Mise à l'échelle horizontale de l'API
 
@@ -244,6 +298,65 @@ Garde-fous :
   `uq_alerts_open_per_machine_type` — mais c'est du travail inutile.
 - L'ouverture d'alerte par seuil (chemin d'ingestion, exécuté dans chaque worker)
   est protégée par ce même index : aucun doublon d'alerte ouverte possible.
+
+## 8bis. Agent en production (systemd)
+
+Le `cargo run --release` du §3 (option B) ne survit pas à un reboot et ne redémarre pas
+après un crash. Pour un déploiement qui tient dans la durée, packaging systemd dans
+`agent/packaging/` :
+
+```bash
+cd agent
+sudo ./packaging/install.sh
+```
+
+Le script (à lancer **sur l'hôte à monitorer**, en root) :
+- compile en release (`cargo build --release`) — ou saute le build si `INSTALL_BIN=<chemin>`
+  pointe vers un binaire déjà compilé (ex. cross-compilé ailleurs) ;
+- crée un utilisateur système dédié non-root `guardianops` (sans home, sans shell) ;
+- installe le binaire + `agent.toml` (copié depuis `agent.toml.example` **seulement s'il
+  n'existe pas déjà** — ne jamais écraser une config existante) dans `/opt/guardianops-agent` ;
+- installe et active `guardianops-agent.service` (`Restart=on-failure`, durci —
+  `NoNewPrivileges`/`ProtectSystem=strict`/`ProtectHome`/`PrivateTmp` ; aucune capacité réseau
+  spéciale requise, le scan est rootless cf. §9).
+
+Après installation : éditer `/opt/guardianops-agent/agent.toml` (`api_url` + `enroll_token`,
+obtenu via `POST /machines` comme au §3), puis :
+
+```bash
+sudo systemctl start guardianops-agent
+sudo systemctl status guardianops-agent
+sudo journalctl -u guardianops-agent -f
+```
+
+Après le premier enrôlement réussi, `agent_state.toml` apparaît dans `/opt/guardianops-agent/`
+(machine_id + agent_token) — `enroll_token` peut alors être retiré de `agent.toml`.
+
+**Mise à jour d'une version ultérieure** : ré-exécuter `sudo ./packaging/install.sh` (rebuild +
+réinstalle le binaire, conserve `agent.toml`/`agent_state.toml` existants), puis
+`sudo systemctl restart guardianops-agent`.
+
+## 8ter. Durcissement du serveur (pare-feu, anti-bruteforce SSH)
+
+Généralités serveur Linux, valables pour tout hôte exposé publiquement (le VPS qui porte
+`docker-compose.prod.yml` §8, comme l'agent installé au §8bis sur l'hôte monitoré) :
+
+```bash
+# Pare-feu : seuls SSH + HTTP/HTTPS ouverts au monde
+sudo ufw default deny incoming
+sudo ufw allow 22/tcp
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw enable
+
+# Anti-bruteforce SSH
+sudo apt install fail2ban
+sudo systemctl enable --now fail2ban
+```
+
+`db`/`redis` ne sont **jamais** publiés hors de l'hôte (§8, `ports: !override []`) — ufw n'a
+donc rien de plus à fermer pour eux. Sauvegarder les identifiants `.env` (`POSTGRES_PASSWORD`,
+`REDIS_PASSWORD`, `JWT_SECRET`) hors du serveur, comme `CRYPTO_KEY` côté SGI.
 
 ## 9. Scan réseau (surveillance in/out)
 
