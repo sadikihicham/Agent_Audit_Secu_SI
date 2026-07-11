@@ -8,6 +8,13 @@ pub struct Config {
     #[serde(default = "default_api_url")]
     pub api_url: String,
 
+    /// Chemin vers un certificat CA supplémentaire (PEM) à faire accepter par CE client HTTP
+    /// uniquement — sans toucher au magasin de confiance du système. Utile en interim, avant
+    /// que le DNS soit posé : `api_url` pointe alors sur une IP avec un certificat auto-signé
+    /// (Caddy `tls internal`, cf. docker-compose.prod-ip.yml côté API), que l'OS ne connaît pas.
+    /// Retirez ce champ dès que l'API repasse sur un vrai domaine + Let's Encrypt.
+    pub ca_cert_path: Option<String>,
+
     /// Token d'enrôlement (usage unique, fourni par l'admin via POST /machines).
     /// Supprimez-le du fichier après le premier enrôlement.
     pub enroll_token: Option<String>,
@@ -222,6 +229,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             api_url: default_api_url(),
+            ca_cert_path: None,
             enroll_token: None,
             interval_secs: default_interval(),
             max_queue_size: default_max_queue(),

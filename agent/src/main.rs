@@ -10,7 +10,7 @@ mod transport;
 use std::path::PathBuf;
 use std::time::Duration;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use tokio::time;
 use tracing::{error, info, warn};
 
@@ -38,9 +38,16 @@ async fn main() -> Result<()> {
         config.api_url, config.interval_secs
     );
 
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(15))
-        .build()?;
+    let mut client_builder = reqwest::Client::builder().timeout(Duration::from_secs(15));
+    if let Some(ca_cert_path) = &config.ca_cert_path {
+        let pem = std::fs::read(ca_cert_path)
+            .with_context(|| format!("Lecture ca_cert_path {:?}", ca_cert_path))?;
+        let cert = reqwest::Certificate::from_pem(&pem)
+            .with_context(|| format!("Parsing PEM invalide dans ca_cert_path {:?}", ca_cert_path))?;
+        client_builder = client_builder.add_root_certificate(cert);
+        info!("CA supplémentaire chargée depuis {:?} (scopée à ce client HTTP)", ca_cert_path);
+    }
+    let client = client_builder.build()?;
 
     // ── Enrôlement ──────────────────────────────────────────────────────────
     let state = match AgentState::load(&state_path)? {

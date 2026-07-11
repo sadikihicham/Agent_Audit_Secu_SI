@@ -18,6 +18,15 @@
 # À REMPLACER dès que le DNS est posé : retirer cette surcouche
 # (docker-compose.prod-ip.yml), définir DOMAIN=<domaine réel> dans .env, relancer avec le
 # Caddyfile normal (Let's Encrypt automatique) — cf. docs/runbook.md §8.
+#
+# `default_sni` est OBLIGATOIRE sur une IP nue : le SNI ne peut techniquement PAS transporter
+# une IP littérale (RFC 6066) — la plupart des clients (curl, navigateurs) n'envoient donc
+# AUCUN SNI en se connectant à une IP. Sans `default_sni`, Caddy ne sait pas quel certificat
+# présenter face à un ClientHello sans SNI → poignée de main TLS en échec (alerte
+# "internal_error"), même en local (127.0.0.1). Testé/reproduit avant ce fix.
+{
+	default_sni {$DOMAIN}
+}
 
 https://{$DOMAIN}:{$DASHBOARD_PORT} {
 	tls internal

@@ -4,6 +4,13 @@
 # URL de l'API (sans slash final)
 api_url = "http://localhost:8800"
 
+# Optionnel — certificat CA supplémentaire (PEM) à faire accepter par CE client
+# HTTP uniquement (aucun changement au magasin de confiance du système). Utile
+# en interim, avant que le DNS soit posé : api_url pointe alors sur une IP avec
+# un certificat auto-signé (Caddy `tls internal`, cf. docker-compose.prod-ip.yml
+# + docs/runbook.md). Retirer ce champ dès que l'API repasse sur un domaine réel.
+# ca_cert_path = "/opt/guardianops-agent/caddy-root.crt"
+
 # Token d'enrôlement — fourni par l'admin via POST /machines.
 # OBLIGATOIRE au premier lancement. Peut être supprimé ensuite
 # (agent_state.toml est créé après le premier enrôlement).
