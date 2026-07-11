@@ -16,7 +16,7 @@
 name: guardianops
 
 services:
-  web:
+  go-web:
     build:
       # NEXT_PUBLIC_* est inliné au BUILD par Next.js — le `environment:` runtime ci-dessous
       # n'a aucun effet sur le bundle déjà figé (même bug que côté domaine, docker-compose.prod.yml).

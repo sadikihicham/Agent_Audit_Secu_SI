@@ -14,7 +14,7 @@ Everything runs through Docker Compose (docker-first). Ports are deliberately of
 
 ```bash
 cp .env.example .env          # required before first run
-docker compose up --build     # starts db, redis, api (8800), web (3300)
+docker compose up --build     # starts db, redis, go-api (8800), go-web (3300)
 ```
 
 Verify the stack:
@@ -23,9 +23,9 @@ Verify the stack:
 - OpenAPI docs: http://localhost:8800/docs
 - Dashboard: http://localhost:3300 (green badge = web→API chain OK)
 
-Source is bind-mounted into the `api` and `web` containers, so both hot-reload (uvicorn `--reload`, `next dev`) — no rebuild needed for code changes.
+Source is bind-mounted into the `go-api` and `go-web` containers, so both hot-reload (uvicorn `--reload`, `next dev`) — no rebuild needed for code changes.
 
-**API (Python 3.12, run inside the `api` container or a local venv with `requirements.txt`). All commands below run from `apps/api/` — that's where `pyproject.toml` lives and where the test suite (`apps/api/tests/`) is collected; `testpaths`/`pythonpath` are relative to it, so `pytest` from the repo root finds nothing:**
+**API (Python 3.12, run inside the `go-api` container or a local venv with `requirements.txt`). All commands below run from `apps/api/` — that's where `pyproject.toml` lives and where the test suite (`apps/api/tests/`) is collected; `testpaths`/`pythonpath` are relative to it, so `pytest` from the repo root finds nothing:**
 ```bash
 ruff check .                                  # lint (line-length 100, target py312)
 pip install -r requirements-dev.txt           # test deps (pytest etc.) — NOT in runtime image
@@ -36,7 +36,7 @@ alembic upgrade head                          # apply migrations
 python -m app.cli create-admin <email> <pw>   # seed an admin user
 ```
 
-Run these inside the `api` container, e.g. `docker compose run --rm api <cmd>` (the runtime image lacks test deps; `pip install -r requirements-dev.txt` first when running pytest).
+Run these inside the `go-api` container, e.g. `docker compose run --rm go-api <cmd>` (the runtime image lacks test deps; `pip install -r requirements-dev.txt` first when running pytest). Service keys are `go-api`/`go-web` (not `api`/`web`) — Compose always registers a service's plain key as a DNS alias on every network it joins, and generic names would collide with a co-hosted project's own `api`/`web` services on a shared external network (incident 2026-07-11).
 
 **Web (`apps/web`):**
 ```bash
@@ -71,7 +71,7 @@ Monorepo: `apps/api` (FastAPI backend), `apps/web` (Next.js dashboard), and a fu
 - **Suricata IDS sidecar (optional, deferred default)**: `docker-compose.suricata.yml` runs `suricata` (host network) + an `ids-forwarder` (`infra/suricata/forwarder.py`) that tails `eve.json`, enrolls as an agent, and POSTs alerts to `/ingest/ids`. See `infra/suricata/README.md`.
 - **Web routes**: `app/(dash)/network/page.tsx` (KPIs + device table + state badge), `network/[id]` (device detail), `network/events` (intrusions, ack), `network/vulns` (fleet vulns). UI badges/labels in `components/network-state.tsx`. Real-time via the same `useRealtimeEvents` WS.
 
-**Scaling the API** — two combinable dimensions, both safe because the API is stateless (JWT sessions, WS tickets + events via shared Redis): (1) uvicorn workers via `API_WORKERS` in the prod overlay; (2) **replicas** via `docker-compose.scale.yml` (`API_REPLICAS`, drops the api `container_name` with `!reset`), load-balanced by Caddy's `dynamic a` DNS upstreams (`infra/caddy/Caddyfile`) which re-resolves the `api` service name against Docker DNS (`127.0.0.11`) every 5 s. Apply with `-f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.scale.yml`.
+**Scaling the API** — two combinable dimensions, both safe because the API is stateless (JWT sessions, WS tickets + events via shared Redis): (1) uvicorn workers via `API_WORKERS` in the prod overlay; (2) **replicas** via `docker-compose.scale.yml` (`API_REPLICAS`, drops the go-api `container_name` with `!reset`), load-balanced by Caddy's `dynamic a` DNS upstreams (`infra/caddy/Caddyfile`) which re-resolves the `go-api` service name against Docker DNS (`127.0.0.11`) every 5 s. Apply with `-f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.scale.yml`.
 
 When adding backend features, follow the layout in `PLAN.md §2`: `models/` (SQLAlchemy), `schemas/` (Pydantic), `routers/`, `services/`.
 

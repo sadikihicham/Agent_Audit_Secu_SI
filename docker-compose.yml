@@ -31,7 +31,12 @@ services:
       timeout: 3s
       retries: 10
 
-  api:
+  # Nom de service `go-api` (pas `api`) : Docker enregistre TOUJOURS le nom de service brut comme
+  # DNS sur tout réseau rejoint, y compris un réseau externe partagé (`caddy_net`, cf.
+  # docker-compose.prod-fronted.yml) — un simple alias ne suffit pas à éviter la collision avec
+  # les propres services `api`/`web` d'un autre projet co-hébergé (incident 2026-07-11 : ça a
+  # cassé la résolution `api` côté SGI). `go-api` élimine la classe de bug, pas juste ce cas précis.
+  go-api:
     build:
       context: ./apps/api
     container_name: guardianops-api
@@ -73,7 +78,8 @@ services:
       redis:
         condition: service_healthy
 
-  web:
+  # Nom de service `go-web` (pas `web`) : même raison que `go-api` ci-dessus.
+  go-web:
     build:
       context: ./apps/web
     container_name: guardianops-web
@@ -92,12 +98,12 @@ services:
       - /app/node_modules
       - /app/.next
     depends_on:
-      - api
+      - go-api
 
   # Agent Rust — démarrage optionnel via le profil "agent" :
   #   docker compose --profile agent up agent --build
   # Prérequis : agent/data/agent.toml renseigné (cf. docs/runbook.md).
-  # Sur le réseau Compose l'API est joignable à http://api:8000.
+  # Sur le réseau Compose l'API est joignable à http://go-api:8000.
   agent:
     build:
       context: ./agent
@@ -107,7 +113,7 @@ services:
     volumes:
       - ./agent/data:/agent
     depends_on:
-      - api
+      - go-api
 
 volumes:
   db_data:

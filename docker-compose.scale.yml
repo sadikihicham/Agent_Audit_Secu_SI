@@ -7,7 +7,7 @@
 # (cf. infra/caddy/Caddyfile, bloc `dynamic a` → DNS Docker 127.0.0.11).
 #
 # À retenir :
-#  - le service `api` perd son container_name fixe (sinon réplication impossible) ;
+#  - le service `go-api` perd son container_name fixe (sinon réplication impossible) ;
 #  - 1 process uvicorn par réplique → concurrence totale = nombre de répliques ;
 #  - le `scheduler` reste en instance unique (NE PAS le répliquer).
 #
@@ -15,7 +15,7 @@
 name: guardianops
 
 services:
-  api:
+  go-api:
     # Un nom de conteneur fixe empêche la mise à l'échelle → on le retire.
     container_name: !reset null
     # Une seule instance uvicorn par réplique (la réplication assure le parallélisme).

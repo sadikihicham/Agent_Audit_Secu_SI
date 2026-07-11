@@ -22,13 +22,13 @@ python3 -c "import secrets; print('JWT_SECRET=' + secrets.token_hex(32))"
 # → coller la valeur dans .env (remplacer JWT_SECRET=…)
 
 # 3. Lancer l'infra + l'API + le dashboard
-docker compose up --build -d db redis api web
+docker compose up --build -d db redis go-api go-web
 
 # 4. Appliquer les migrations (crée users, machines, metrics [hypertable], alerts)
-docker compose exec api alembic upgrade head
+docker compose exec go-api alembic upgrade head
 
 # 5. Créer le premier compte admin
-docker compose exec api python -m app.cli create-admin admin@guardianops.ai 'MotDePasseFort!'
+docker compose exec go-api python -m app.cli create-admin admin@guardianops.ai 'MotDePasseFort!'
 ```
 
 Vérifier :
@@ -60,7 +60,7 @@ Lancer l'agent (deux options) :
 **Option A — via Docker Compose (profil `agent`)**
 ```bash
 cp agent/data/agent.toml.example agent/data/agent.toml
-# éditer agent/data/agent.toml : coller enroll_token ; api_url = http://api:8000
+# éditer agent/data/agent.toml : coller enroll_token ; api_url = http://go-api:8000
 docker compose --profile agent up agent --build
 ```
 
@@ -115,8 +115,8 @@ silencieuses toutes les 30 s (cf. `scheduler`).
 
 ```bash
 # Logs
-docker compose logs -f api
-docker compose logs -f web
+docker compose logs -f go-api
+docker compose logs -f go-web
 
 # État des conteneurs
 docker compose ps
@@ -125,8 +125,8 @@ docker compose ps
 docker compose exec db psql -U guardian -d guardianops
 
 # Tests + lint backend (deps de test absentes de l'image runtime)
-docker compose run --rm api sh -c "pip install -r requirements-dev.txt && pytest -q"
-docker compose run --rm api ruff check .
+docker compose run --rm go-api sh -c "pip install -r requirements-dev.txt && pytest -q"
+docker compose run --rm go-api ruff check .
 
 # Arrêt (préserve les données) / purge complète
 docker compose down
@@ -140,12 +140,12 @@ docker compose down -v        # ⚠ supprime le volume DB
 | Symptôme | Cause probable | Résolution |
 |----------|----------------|------------|
 | L'API ne démarre pas, erreur `JWT_SECRET est trop faible` | `JWT_SECRET` absent / défaut / < 32 car. | Générer un secret fort (cf. §2) |
-| `/health/ready` renvoie `database: error` | Migrations non appliquées ou DB non prête | `docker compose exec api alembic upgrade head` |
+| `/health/ready` renvoie `database: error` | Migrations non appliquées ou DB non prête | `docker compose exec go-api alembic upgrade head` |
 | Login → 401 | Compte admin non créé | `python -m app.cli create-admin …` |
 | Agent : `Token d'enrôlement invalide ou déjà utilisé` | Token déjà consommé (usage unique) | Recréer une machine → nouveau token |
-| Dashboard vide alors que l'agent tourne | `api_url` de l'agent incorrect | Compose : `http://api:8000` ; natif : `http://localhost:8800` |
+| Dashboard vide alors que l'agent tourne | `api_url` de l'agent incorrect | Compose : `http://go-api:8000` ; natif : `http://localhost:8800` |
 | WS ne reçoit pas d'événements | Ticket expiré (TTL 30 s) | Le front régénère un ticket à chaque connexion ; vérifier l'auth |
-| Modif de code Python non prise en compte | Cache bytecode du conteneur | `docker compose restart api` |
+| Modif de code Python non prise en compte | Cache bytecode du conteneur | `docker compose restart go-api` |
 
 ---
 
@@ -195,9 +195,9 @@ Les DNS `mon-domaine.com` et `api.mon-domaine.com` doivent pointer vers l'hôte
 ### Lancement
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
-# migrations + admin (le service api n'a pas de port publié → exec dans le conteneur)
-docker compose -f docker-compose.yml -f docker-compose.prod.yml exec api alembic upgrade head
-docker compose -f docker-compose.yml -f docker-compose.prod.yml exec api \
+# migrations + admin (le service go-api n'a pas de port publié → exec dans le conteneur)
+docker compose -f docker-compose.yml -f docker-compose.prod.yml exec go-api alembic upgrade head
+docker compose -f docker-compose.yml -f docker-compose.prod.yml exec go-api \
   python -m app.cli create-admin admin@mon-domaine.com '<motdepasse>'
 ```
 
@@ -221,15 +221,15 @@ REDIS_PASSWORD=<fort>
 docker compose -f docker-compose.yml -f docker-compose.prod.yml \
                -f docker-compose.prod-ip.yml up -d --build
 docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.prod-ip.yml \
-  exec api alembic upgrade head
+  exec go-api alembic upgrade head
 docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.prod-ip.yml \
-  exec api python -m app.cli create-admin admin@example.com '<motdepasse>'
+  exec go-api python -m app.cli create-admin admin@example.com '<motdepasse>'
 ```
 
 - Dashboard : `https://<IP>:${DASHBOARD_PORT:-443}/` · API : `https://<IP>:${API_PORT:-8443}/` —
   **avertissement navigateur attendu** (certificat auto-signé, normal en attendant le DNS).
 - Le rate-limiter de login (§7) et le `--proxy-headers` (§8) restent actifs à l'identique — hérités
-  de `docker-compose.prod.yml`, cette surcouche ne touche que `proxy` et `web`.
+  de `docker-compose.prod.yml`, cette surcouche ne touche que `proxy` et `go-web`.
 
 **Co-hébergement avec un autre service sur le même serveur** (80/443 déjà pris — ex. un autre
 site derrière son propre Caddy) : surcharger `DASHBOARD_PORT`/`API_PORT` dans `.env` :
@@ -251,13 +251,13 @@ libres sur ce serveur ou déjà pris par un autre service :
 # 1. Poser les DNS A : mon-domaine.com + api.mon-domaine.com → IP du serveur
 # 2. .env : DOMAIN=mon-domaine.com (remplace l'IP)
 # 3. Relancer SANS la surcouche -ip (retour au Caddyfile normal, Let's Encrypt automatique)
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build proxy web
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build proxy go-web
 ```
 
 **B. Serveur CO-HÉBERGÉ (80/443 déjà pris par un autre projet, ex. SGI)** — Let's Encrypt en mode
 standard (HTTP-01/TLS-ALPN-01) est IMPOSSIBLE sans ces ports. Solution : faire fronter par le
 Caddy de l'AUTRE projet (déjà propriétaire de 80/443 + Let's Encrypt fonctionnel), qui reverse-proxy
-directement vers `web`/`api` via un réseau Docker externe partagé — surcouche
+directement vers `go-web`/`go-api` via un réseau Docker externe partagé — surcouche
 `docker-compose.prod-fronted.yml` :
 ```bash
 # 1. Poser les DNS A : go.mon-domaine.com + api.go.mon-domaine.com → IP du serveur
@@ -270,12 +270,13 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compos
   stop proxy && docker compose -f docker-compose.yml -f docker-compose.prod.yml \
   -f docker-compose.prod-ip.yml rm -f proxy
 docker compose -f docker-compose.yml -f docker-compose.prod.yml \
-  -f docker-compose.prod-fronted.yml up -d --build db redis api scheduler web
+  -f docker-compose.prod-fronted.yml up -d --build db redis go-api scheduler go-web
 # 5. Côté AUTRE projet : ajouter 2 blocs Caddyfile (dashboard + API, reverse_proxy vers
-#    go-web:3000 / go-api:8000 sur le réseau partagé) + variables d'env correspondantes,
+#    go-web:3000 / go-api:8000 sur le réseau partagé — CE SONT LES NOMS DE SERVICE eux-mêmes,
+#    pas de simples alias, cf. incident 2026-07-11) + variables d'env correspondantes,
 #    puis recréer SON Caddy (`up -d --force-recreate caddy`) pour obtenir les certificats.
 ```
-Aucune exposition publique propre à GuardianOps dans ce mode (`web`/`api` ne rejoignent QUE le
+Aucune exposition publique propre à GuardianOps dans ce mode (`go-web`/`go-api` ne rejoignent QUE le
 réseau partagé + le réseau interne du projet — 0 port publié). Fermer les règles pare-feu
 ouvertes pour le mode IP si elles ne servent plus (`sudo ufw delete allow 8443/tcp` etc.).
 Une fois basculé, `agent.toml` doit pointer sur le nouveau domaine public (`api_url =
@@ -295,7 +296,7 @@ Deux dimensions de scaling, combinables :
 
 ```bash
 echo "API_WORKERS=4" >> .env
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d api
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d go-api
 ```
 
 La commande prod de l'API devient `uvicorn … --workers 4`.

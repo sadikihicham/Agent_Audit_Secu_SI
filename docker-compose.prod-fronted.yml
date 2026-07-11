@@ -1,16 +1,17 @@
 # Surcouche pour un déploiement CO-HÉBERGÉ derrière le Caddy d'un AUTRE projet sur le même hôte
 # (ex. SGI, qui possède déjà 80/443 + Let's Encrypt fonctionnel). GuardianOps n'expose plus RIEN
-# publiquement lui-même : `web`/`api` rejoignent le réseau Docker EXTERNE partagé `caddy_net`
-# (déjà créé par le projet hôte, cf. son docker-compose.prod.yml) sous des alias dédiés
-# (`go-web`/`go-api`, pour ne jamais entrer en collision avec les propres `web`/`api` de l'hôte
-# sur ce même réseau partagé) — c'est SON Caddy qui reverse-proxy directement dessus.
+# publiquement lui-même : `go-web`/`go-api` (services renommés depuis `web`/`api` — incident
+# 2026-07-11, cf. docker-compose.yml) rejoignent le réseau Docker EXTERNE partagé `caddy_net`
+# (déjà créé par le projet hôte, cf. son docker-compose.prod.yml) — c'est SON Caddy qui
+# reverse-proxy directement dessus. Pas besoin d'alias ici : le nom de service EST déjà
+# `go-web`/`go-api`, donc c'est ce nom que Docker enregistre nativement sur `caddy_net`.
 #
 # Le service `proxy` (Caddy propre à GuardianOps, utilisé par docker-compose.prod-ip.yml) devient
 # INUTILE dans ce mode : ne pas le démarrer (lister explicitement les services voulus au `up`).
 #
 #   docker network inspect caddy_net >/dev/null 2>&1 || docker network create caddy_net
 #   DOMAIN=go.infinityauh.com docker compose -f docker-compose.yml -f docker-compose.prod.yml \
-#          -f docker-compose.prod-fronted.yml up -d --build db redis api scheduler web
+#          -f docker-compose.prod-fronted.yml up -d --build db redis go-api scheduler go-web
 #
 # Voir docs/runbook.md pour la configuration correspondante côté Caddy de l'hôte (SGI).
 name: guardianops
@@ -20,16 +21,12 @@ networks:
     external: true
 
 services:
-  web:
+  go-web:
     networks:
       default: {}
-      caddy_net:
-        aliases:
-          - go-web
+      caddy_net: {}
 
-  api:
+  go-api:
     networks:
       default: {}
-      caddy_net:
-        aliases:
-          - go-api
+      caddy_net: {}

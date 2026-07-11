@@ -28,7 +28,7 @@ services:
       context: .
       dockerfile: infra/suricata/Dockerfile.forwarder
     environment:
-      - API_URL=${IDS_API_URL:-http://api:8000}
+      - API_URL=${IDS_API_URL:-http://go-api:8000}
       - IDS_ENROLL_TOKEN=${IDS_ENROLL_TOKEN:-}
       - EVE_PATH=/var/log/suricata/eve.json
       - STATE_PATH=/state/state.json
@@ -37,7 +37,7 @@ services:
       - suricata-logs:/var/log/suricata:ro
       - ids-forwarder-state:/state
     depends_on:
-      - api
+      - go-api
     restart: unless-stopped
 
 volumes:

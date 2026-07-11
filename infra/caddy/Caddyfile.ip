@@ -31,7 +31,7 @@
 https://{$DOMAIN}:{$DASHBOARD_PORT} {
 	tls internal
 	encode gzip
-	reverse_proxy web:3000
+	reverse_proxy go-web:3000
 }
 
 https://{$DOMAIN}:{$API_PORT} {
@@ -39,7 +39,7 @@ https://{$DOMAIN}:{$API_PORT} {
 	encode gzip
 	reverse_proxy {
 		dynamic a {
-			name api
+			name go-api
 			port 8000
 			refresh 5s
 			resolvers 127.0.0.11
