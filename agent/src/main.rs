@@ -42,10 +42,14 @@ async fn main() -> Result<()> {
     if let Some(ca_cert_path) = &config.ca_cert_path {
         let pem = std::fs::read(ca_cert_path)
             .with_context(|| format!("Lecture ca_cert_path {:?}", ca_cert_path))?;
-        let cert = reqwest::Certificate::from_pem(&pem)
-            .with_context(|| format!("Parsing PEM invalide dans ca_cert_path {:?}", ca_cert_path))?;
+        let cert = reqwest::Certificate::from_pem(&pem).with_context(|| {
+            format!("Parsing PEM invalide dans ca_cert_path {:?}", ca_cert_path)
+        })?;
         client_builder = client_builder.add_root_certificate(cert);
-        info!("CA supplémentaire chargée depuis {:?} (scopée à ce client HTTP)", ca_cert_path);
+        info!(
+            "CA supplémentaire chargée depuis {:?} (scopée à ce client HTTP)",
+            ca_cert_path
+        );
     }
     let client = client_builder.build()?;
 
