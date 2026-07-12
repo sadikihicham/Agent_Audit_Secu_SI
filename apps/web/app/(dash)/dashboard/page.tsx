@@ -84,7 +84,7 @@ export default function DashboardPage() {
             <Link
               key={m.id}
               href={`/machines/${m.id}`}
-              className="group rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-all hover:border-sky-400 hover:shadow dark:border-slate-700/50 dark:bg-slate-800/40 dark:shadow-none dark:hover:border-sky-600/50 dark:hover:bg-slate-800/70"
+              className="group rounded-xl border border-slate-200 bg-white p-4 shadow-xs transition-all hover:border-sky-400 hover:shadow dark:border-slate-700/50 dark:bg-slate-800/40 dark:shadow-none dark:hover:border-sky-600/50 dark:hover:bg-slate-800/70"
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
