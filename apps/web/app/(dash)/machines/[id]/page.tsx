@@ -75,7 +75,7 @@ function MetricChart({
   const latest = data.length > 0 ? data[data.length - 1][dataKey] : null;
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700/50 dark:bg-slate-800/40 dark:shadow-none">
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-700/50 dark:bg-slate-800/40 dark:shadow-none">
       <div className="mb-3 flex items-center justify-between">
         <span className="text-xs font-medium text-slate-600 dark:text-slate-300">{label}</span>
         {latest !== null && (
