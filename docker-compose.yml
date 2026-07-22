@@ -26,7 +26,11 @@ services:
     ports:
       - "${REDIS_PORT:-6380}:6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      # Sonde d'ÉCRITURE jugée sur la SORTIE (mêmes raisons qu'en prod, cf. docker-compose.prod.yml) :
+      # `redis-cli` rend rc=0 sur toute erreur applicative, donc `ping` jugé par `$?` ne rougit que
+      # si le serveur est injoignable en TCP. On garde dev et prod symétriques : une sonde corrigée
+      # seulement en prod dérive, et c'est en dev qu'on la voit tomber en premier.
+      test: ["CMD-SHELL", "redis-cli set __healthcheck__ 1 EX 30 | grep -qx OK"]
       interval: 5s
       timeout: 3s
       retries: 10
