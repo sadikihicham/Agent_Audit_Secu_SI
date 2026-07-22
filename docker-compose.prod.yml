@@ -24,8 +24,26 @@ services:
   redis:
     command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?REDIS_PASSWORD requis en production}"]
     ports: !override []
+    # Le secret est passé par `REDISCLI_AUTH` (lu nativement par redis-cli) et NON en argument `-a`
+    # de la sonde : la sonde ci-dessous passe par un shell, et un mot de passe contenant un
+    # guillemet ou une espace y casserait le quoting — la sonde échouerait alors TOUJOURS et
+    # bloquerait `depends_on: service_healthy`, donc le déploiement. Effet de bord utile : le
+    # secret ne figure plus dans la ligne de commande du healthcheck.
+    environment:
+      REDISCLI_AUTH: ${REDIS_PASSWORD:?REDIS_PASSWORD requis en production}
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      # Sonde d'ÉCRITURE jugée sur la SORTIE, pas `ping` jugé sur le code de sortie. Mesuré sur
+      # `redis-cli 7.4.9` : le client ne traduit JAMAIS une erreur applicative en code de sortie
+      # (rc=0 sur `NOAUTH`, sur `WRONGPASS` et sur `OOM command not allowed`) et il poursuit après
+      # un échec d'authentification. Un `ping` jugé par `$?` ne peut donc virer au rouge que si le
+      # serveur est injoignable en TCP. Deux pannes réelles passaient au vert :
+      #   1. `REDIS_PASSWORD` tourné sans recréer les deux côtés ⇒ l'api prend `NOAUTH` et meurt,
+      #      le conteneur redis reste `healthy` ;
+      #   2. saturation mémoire ⇒ `PING` répond `PONG` (l'OOM ne refuse que les ÉCRITURES).
+      # Vérifié par MUTATION : sur un serveur au mot de passe désynchronisé, l'ancienne sonde reste
+      # `healthy` là où celle-ci passe `unhealthy`. `grep -qx` évite un `$` que Compose interpolerait.
+      # La clé porte un TTL : évincable, jamais un poison pill sous une politique `volatile-*`.
+      test: ["CMD-SHELL", "redis-cli set __healthcheck__ 1 EX 30 | grep -qx OK"]
       interval: 5s
       timeout: 3s
       retries: 10
